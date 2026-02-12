@@ -1,0 +1,71 @@
+<div class="w-full">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-sm font-medium mb-1">Total Movies</p>
+                    <p class="text-3xl font-bold">{{stats.totalMovies}}</p>
+                </div>
+                <div class="bg-blue-400 bg-opacity-30 rounded-full p-3">
+                    <i class="fas fa-film text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-green-100 text-sm font-medium mb-1">Total Users</p>
+                    <p class="text-3xl font-bold">{{stats.totalUsers}}</p>
+                </div>
+                <div class="bg-green-400 bg-opacity-30 rounded-full p-3">
+                    <i class="fas fa-users text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-6 rounded-lg shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-yellow-100 text-sm font-medium mb-1">Featured Movies</p>
+                    <p class="text-3xl font-bold">{{stats.featuredMovies}}</p>
+                </div>
+                <div class="bg-yellow-400 bg-opacity-30 rounded-full p-3">
+                    <i class="fas fa-star text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-purple-100 text-sm font-medium mb-1">Trending Movies</p>
+                    <p class="text-3xl font-bold">{{stats.trendingMovies}}</p>
+                </div>
+                <div class="bg-purple-400 bg-opacity-30 rounded-full p-3">
+                    <i class="fas fa-fire text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">Quick Actions</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <a href="/admin/movies/new" class="flex items-center justify-center bg-blue-500 text-white p-4 rounded-lg hover:bg-blue-600 transition shadow-md">
+                <i class="fas fa-plus mr-2"></i>
+                Add New Movie
+            </a>
+            <a href="/admin/movies" class="flex items-center justify-center bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition shadow-md">
+                <i class="fas fa-film mr-2"></i>
+                Manage Movies
+            </a>
+            <a href="/admin/users" class="flex items-center justify-center bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition shadow-md">
+                <i class="fas fa-users mr-2"></i>
+                Manage Users
+            </a>
+        </div>
+    </div>
+</div>
