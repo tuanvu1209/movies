@@ -175,12 +175,13 @@ export function WatchScreen({ navigation, route }: Props) {
       if (showEpisodeSelector) {
         return;
       }
+      // Nút lên: hiện control video + tiêu đề và tập góc trái
       showTitleAndScheduleHide();
       if (type === "left") {
         seekBy(-10);
       } else if (type === "right") {
         seekBy(10);
-      } else if (type === "up" || type === "down") {
+      } else if (type === "down") {
         openEpisodeSelector();
       }
       setFocusAnchor((v) => v + 1);
@@ -209,7 +210,7 @@ export function WatchScreen({ navigation, route }: Props) {
         <VideoView
           player={player}
           style={styles.video}
-          nativeControls={true}
+          nativeControls={showTitle}
         />
 
         <View
@@ -439,7 +440,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#080808",
     borderLeftWidth: 1,
     borderLeftColor: colors.border,
-    paddingTop: 42,
+    paddingTop: 12,
   },
   sheetHeader: {
     flexDirection: "row",

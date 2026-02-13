@@ -8,7 +8,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$backendDir = Join-Path $PSScriptRoot ".." "backend"
+$backendDir = Join-Path (Join-Path $PSScriptRoot "..") "backend"
 
 Push-Location $backendDir
 try {

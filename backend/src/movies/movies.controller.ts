@@ -59,7 +59,12 @@ export class MoviesController {
     @Query('q') q: string,
     @Res() res: Response,
   ) {
-    const query = (q ?? '').trim();
+    let query = (q ?? '').trim();
+    try {
+      query = decodeURIComponent(query).trim();
+    } catch {
+      // keep as-is if not valid encoded (e.g. plain text)
+    }
     if (query.length < 2) {
       return res.json([]);
     }

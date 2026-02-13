@@ -1,6 +1,10 @@
 # Build APK for mobile app and output to mobile/build
 # Usage: .\scripts\build-mobile-apk.ps1
 # Requires: Node.js, JDK 17+, Android SDK (ANDROID_HOME)
+#
+# On Windows, if you see "Filename longer than 260 characters" (CMake/Ninja),
+# this script uses a subst drive (W:) to shorten paths. Alternatively enable
+# long paths: Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1
 
 param(
     [switch]$SkipPrebuild  # Skip prebuild if android/ already exists and is up to date
@@ -8,15 +12,40 @@ param(
 
 $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$mobileDir = Join-Path $scriptRoot ".." "mobile"
+$repoRoot = (Resolve-Path (Join-Path $scriptRoot "..")).Path
+$mobileDir = Join-Path $repoRoot "mobile"
 $buildDir = Join-Path $mobileDir "build"
 $androidDir = Join-Path $mobileDir "android"
+$apkDest = $null   # set below after $appName, $version
+
+# On Windows, use a subst drive to avoid CMake/Ninja "path > 260 chars" errors
+# (full build paths like .cxx\...\node_modules\react-native-safe-area-context\... exceed 260 chars)
+$substDrive = $null
+$isWindows = $IsWindows -or $env:OS -match "Windows"
+if ($isWindows) {
+    $usedDrives = Get-PSDrive -PSProvider FileSystem | ForEach-Object { $_.Name }
+    foreach ($driveLetter in @("W", "X", "Y")) {
+        if ($usedDrives -notcontains $driveLetter) {
+            subst "${driveLetter}:" $repoRoot
+            $substDrive = "${driveLetter}:"
+            $mobileDir = "${driveLetter}:\mobile"
+            $buildDir = "${driveLetter}:\mobile\build"
+            $androidDir = "${driveLetter}:\mobile\android"
+            Write-Host "Using $substDrive\ to shorten paths (avoids 260-char limit)." -ForegroundColor Gray
+            break
+        }
+    }
+    if (-not $substDrive) {
+        Write-Host "Warning: Could not create subst (W:, X:, Y: in use). Build may fail with path > 260 chars." -ForegroundColor Yellow
+    }
+}
 
 # Read version from app.json for output filename
 $appJsonPath = Join-Path $mobileDir "app.json"
 $appJson = Get-Content $appJsonPath -Raw | ConvertFrom-Json
 $version = $appJson.expo.version
 $appName = $appJson.expo.name -replace '\s+', ''
+$apkDest = Join-Path $buildDir "$appName-$version.apk"
 
 Write-Host "Building APK for $appName v$version..." -ForegroundColor Cyan
 Write-Host "Output folder: $buildDir" -ForegroundColor Gray
@@ -52,20 +81,19 @@ try {
         Pop-Location
     }
 
-    # 3. Copy APK to mobile/build with a clear name
-    $apkSource = Join-Path $androidDir (Join-Path "app" "build" "outputs" "apk" "release" "app-release.apk")
-    $apkDest = Join-Path $buildDir "${appName}-${version}.apk"
+    # Copy APK from Gradle output to mobile/build with friendly name
+    $gradleApk = Join-Path $androidDir "app\build\outputs\apk\release\app-release.apk"
+    if (-not (Test-Path $gradleApk)) { throw "Gradle did not produce APK at expected path" }
+    Copy-Item -Path $gradleApk -Destination $apkDest -Force
+    Write-Host "`n[3/3] Copied APK to build folder." -ForegroundColor Yellow
 
-    if (-not (Test-Path $apkSource)) {
-        throw "APK not found at: $apkSource"
-    }
-
-    Copy-Item -Path $apkSource -Destination $apkDest -Force
-    Write-Host "`n[3/3] APK copied to build/" -ForegroundColor Yellow
-
-    $fullPath = (Resolve-Path $apkDest).Path
+    $apkDisplayPath = if ($substDrive) { Join-Path $repoRoot "mobile\build\$appName-$version.apk" } else { (Resolve-Path $apkDest).Path }
     Write-Host "`nDone. APK: mobile\build\$($appName)-${version}.apk" -ForegroundColor Green
-    Write-Host "Full path: $fullPath" -ForegroundColor Gray
+    Write-Host "Full path: $apkDisplayPath" -ForegroundColor Gray
 } finally {
     Pop-Location
+    if ($substDrive) {
+        subst $substDrive /D
+        Write-Host "Removed subst $substDrive" -ForegroundColor Gray
+    }
 }

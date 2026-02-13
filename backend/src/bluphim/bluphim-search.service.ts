@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { SearchResult } from '../shared/types/search.types';
@@ -19,9 +19,11 @@ interface FlatsomeSearchResponse {
 @Injectable()
 export class BluphimSearchService {
   private readonly baseUrl: string;
+  private readonly logger = new Logger(BluphimSearchService.name);
 
   constructor(private readonly configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>('BLUPHIM_BASE_URL') || 'https://bluphim.me';
+    const raw = this.configService.get<string>('BLUPHIM_BASE_URL') || 'https://bluphim.me';
+    this.baseUrl = (raw.trim().replace(/[\x00-\x1f\x7f]+/g, '').replace(/\/+$/, '') || 'https://bluphim.me');
   }
 
   /** Gọi flatsome_ajax_search_products, trả về danh sách gợi ý (title, url slug, thumbnail). */
@@ -68,9 +70,12 @@ export class BluphimSearchService {
 
       return results;
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Bluphim search error:', error);
-      }
+      const status = axios.isAxiosError(error) ? error.response?.status : null;
+      const message = axios.isAxiosError(error) ? error.message : (error as Error)?.message;
+      this.logger.warn(
+        `Search failed for "${trimmed}": ${message}${status != null ? ` (HTTP ${status})` : ''}. ` +
+          'If this only happens in production, the external site may be blocking server IP.',
+      );
       return [];
     }
   }

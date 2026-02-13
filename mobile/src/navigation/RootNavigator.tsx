@@ -7,6 +7,7 @@ import { PageLoading } from "../components/PageLoading";
 import { CategoryScreen } from "../screens/CategoryScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { LoginScreen } from "../screens/LoginScreen";
+import { SearchScreen } from "../screens/SearchScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { WatchScreen } from "../screens/WatchScreen";
 import { RootStackParamList } from "./types";
@@ -36,6 +37,7 @@ export function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="Category" component={CategoryScreen} />
         <Stack.Screen name="Watch" component={WatchScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />

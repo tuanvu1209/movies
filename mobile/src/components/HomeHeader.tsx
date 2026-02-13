@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -14,12 +13,9 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { User } from "../types/user";
 import { colors } from "../constants/theme";
 import { FocusablePressable } from "./FocusablePressable";
-import { getNav, getSearch } from "../lib/api";
+import { getNav } from "../lib/api";
 import type { NavItem } from "../types/nav";
-import type { SearchResult } from "../types/search";
 import type { RootStackParamList } from "../navigation/types";
-
-const SEARCH_DEBOUNCE_MS = 300;
 
 function getSlugFromUrl(url: string): string {
   try {
@@ -43,12 +39,14 @@ interface HomeHeaderProps {
 
 export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, "Home">>();
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [navItems, setNavItems] = useState<NavItem[]>([]);
-  const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
   const [openDropdownKey, setOpenDropdownKey] = useState<string | null>(null);
+  const [dropdownLayout, setDropdownLayout] = useState<{
+    x: number;
+    y: number;
+    width: number;
+  } | null>(null);
+  const menuItemRefs = useRef<Record<string, View | null>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -62,37 +60,6 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
     })();
     return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => {
-    if (!query.trim()) {
-      setDebouncedQuery("");
-      return;
-    }
-    const t = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  useEffect(() => {
-    if (debouncedQuery.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    let cancelled = false;
-    setSearchLoading(true);
-    getSearch(debouncedQuery)
-      .then((data) => {
-        if (!cancelled) setSuggestions(data ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setSuggestions([]);
-      })
-      .finally(() => {
-        if (!cancelled) setSearchLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [debouncedQuery]);
-
-  const showSuggest = query.trim().length >= 2;
 
   const handleNavPress = useCallback(
     (item: NavItem) => {
@@ -109,16 +76,9 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
   const handleChildPress = useCallback(
     (child: NavItem) => {
       setOpenDropdownKey(null);
+      setDropdownLayout(null);
       const slug = getSlugFromUrl(child.url);
       if (slug) navigation.navigate("Category", { slug });
-    },
-    [navigation],
-  );
-
-  const handleSuggestionPress = useCallback(
-    (item: SearchResult) => {
-      setQuery("");
-      navigation.navigate("Watch", { id: item.url });
     },
     [navigation],
   );
@@ -126,50 +86,21 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
   return (
     <View style={styles.container}>
       <View style={styles.rowTop}>
+        <View style={styles.leftActions}/>
         <Image
           source={require("../../assets/logo.png")}
           style={styles.logo}
           resizeMode="contain"
         />
-        <View style={styles.searchWrap}>
-          <View style={styles.searchBox}>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              style={styles.searchInput}
-              placeholder="Tìm kiếm"
-              placeholderTextColor={colors.textSubtle}
-              autoFocus
-            />
-          </View>
-          {showSuggest && (
-            <View style={styles.suggestBox}>
-              {searchLoading ? (
-                <Text style={styles.suggestPlaceholder}>Đang tìm...</Text>
-              ) : suggestions.length > 0 ? (
-                <ScrollView
-                  style={styles.suggestList}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {suggestions.map((item) => (
-                    <Pressable
-                      key={item.url}
-                      style={styles.suggestItem}
-                      onPress={() => handleSuggestionPress(item)}
-                    >
-                      <Text style={styles.suggestTitle} numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              ) : (
-                <Text style={styles.suggestPlaceholder}>Không tìm thấy</Text>
-              )}
-            </View>
-          )}
-        </View>
         <View style={styles.rightActions}>
+          <FocusablePressable
+            style={styles.searchWrap}
+            onPress={() => navigation.navigate("Search")}
+          >
+            <View style={styles.searchBox}>
+              <Text style={styles.searchPlaceholder}>Tìm kiếm</Text>
+            </View>
+          </FocusablePressable>
 
           {user ? (
             <FocusablePressable onPress={onLogout} style={styles.focusableLink}>
@@ -177,9 +108,6 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
             </FocusablePressable>
           ) : (
             <>
-              <FocusablePressable onPress={onRegister} style={styles.focusableLink}>
-                <Text style={styles.link}>Đăng ký</Text>
-              </FocusablePressable>
               <FocusablePressable onPress={onSignIn} style={styles.focusableButton}>
                 <Text style={styles.signInButton}>Đăng nhập</Text>
               </FocusablePressable>
@@ -195,10 +123,32 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
         {navItems.map((item) => {
           if (item.children?.length) {
             const isOpen = openDropdownKey === item.title;
+            const openDropdown = () => {
+              if (isOpen) {
+                setOpenDropdownKey(null);
+                setDropdownLayout(null);
+                return;
+              }
+              const ref = menuItemRefs.current[item.title];
+              if (ref && typeof ref.measureInWindow === "function") {
+                ref.measureInWindow((x, y, width, height) => {
+                  setDropdownLayout({ x, y: y + height, width });
+                  setOpenDropdownKey(item.title);
+                });
+              } else {
+                setOpenDropdownKey(item.title);
+                setDropdownLayout({ x: 16, y: 120, width: 200 });
+              }
+            };
             return (
-              <View key={item.title} style={styles.menuItem}>
+              <View
+                key={item.title}
+                ref={(r) => { menuItemRefs.current[item.title] = r; }}
+                collapsable={false}
+                style={styles.menuItem}
+              >
                 <FocusablePressable
-                  onPress={() => setOpenDropdownKey(isOpen ? null : item.title)}
+                  onPress={openDropdown}
                   style={styles.menuLink}
                 >
                   <Text style={styles.menuText}>{item.title}</Text>
@@ -208,30 +158,47 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
                   visible={isOpen}
                   transparent
                   animationType="fade"
-                  onRequestClose={() => setOpenDropdownKey(null)}
+                  onRequestClose={() => {
+                    setOpenDropdownKey(null);
+                    setDropdownLayout(null);
+                  }}
                 >
                   <Pressable
                     style={styles.dropdownBackdrop}
-                    onPress={() => setOpenDropdownKey(null)}
+                    onPress={() => {
+                      setOpenDropdownKey(null);
+                      setDropdownLayout(null);
+                    }}
                   />
-                  <View style={styles.dropdownBox}>
-                    <Text style={styles.dropdownTitle}>{item.title}</Text>
-                    <ScrollView style={styles.dropdownList}>
-                      {item.children.map((child) => {
-                        const slug = getSlugFromUrl(child.url);
-                        if (!slug) return null;
-                        return (
-                          <FocusablePressable
-                            key={child.url}
-                            onPress={() => handleChildPress(child)}
-                            style={styles.dropdownItem}
-                          >
-                            <Text style={styles.dropdownItemText}>{child.title}</Text>
-                          </FocusablePressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
+                  {dropdownLayout && (
+                    <View
+                      style={[
+                        styles.dropdownBox,
+                        {
+                          position: "absolute",
+                          left: dropdownLayout.x,
+                          top: dropdownLayout.y,
+                          minWidth: Math.max(dropdownLayout.width, 200),
+                        },
+                      ]}
+                    >
+                      <ScrollView style={styles.dropdownList}>
+                        {item.children
+                          .map((child) => ({ child, slug: getSlugFromUrl(child.url) }))
+                          .filter(({ slug }) => !!slug)
+                          .map(({ child }, index) => (
+                            <FocusablePressable
+                              key={child.url}
+                              onPress={() => handleChildPress(child)}
+                              style={styles.dropdownItem}
+                              hasTVPreferredFocus={index === 0}
+                            >
+                              <Text style={styles.dropdownItemText}>{child.title}</Text>
+                            </FocusablePressable>
+                          ))}
+                      </ScrollView>
+                    </View>
+                  )}
                 </Modal>
               </View>
             );
@@ -267,6 +234,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  leftActions: {
+    width: 120,
+  },
   logoWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -284,7 +254,6 @@ const styles = StyleSheet.create({
   rightActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
   },
   focusableLink: {
     paddingVertical: 6,
@@ -296,54 +265,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   searchWrap: {
-    position: "relative",
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    minWidth: 80,
   },
   searchBox: {
+    flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     borderRadius: 8,
     paddingHorizontal: 10,
     height: 36,
-    minWidth: 340,
+    justifyContent: "center",
   },
-  searchInput: {
-    flex: 1,
-    color: colors.text,
+  searchPlaceholder: {
+    color: colors.textSubtle,
     fontSize: 13,
-    paddingVertical: 0,
-    minWidth: 120,
-  },
-  suggestBox: {
-    position: "absolute",
-    left: 0,
-    top: 40,
-    width: 220,
-    maxHeight: 240,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    zIndex: 100,
-  },
-  suggestList: {
-    maxHeight: 200,
-  },
-  suggestItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  suggestTitle: {
-    color: colors.text,
-    fontSize: 14,
-  },
-  suggestPlaceholder: {
-    color: colors.textMuted,
-    fontSize: 13,
-    padding: 12,
   },
   link: {
     color: colors.text,
@@ -387,11 +325,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
   },
   dropdownBox: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    top: "30%",
-    maxHeight: "50%",
+    maxHeight: 320,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
