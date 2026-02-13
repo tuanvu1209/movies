@@ -9,21 +9,35 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
   constructor(private configService: ConfigService) {}
 
   createTypeOrmOptions(): TypeOrmModuleOptions {
-    const isDevelopment = this.configService.get<string>('NODE_ENV') === 'development';
+    const getEnv = (key: string, fallback = ''): string =>
+      (this.configService.get<string>(key) ?? fallback).trim();
+
+    const nodeEnv = getEnv('NODE_ENV');
+    const isDevelopment = nodeEnv === 'development' || nodeEnv === '';
+    const isServerless = this.configService.get<string>('VERCEL') === '1';
+    const poolSize = isDevelopment ? { max: 20, min: 5 } : { max: 5, min: 0 };
+    // Chỉ bật SSL khi production hoặc khi có DATABASE_SSL=true (VD: Vercel/cloud). DATABASE_SSL=false để tắt.
+    const useSsl =
+      getEnv('DATABASE_SSL') === 'false'
+        ? false
+        : nodeEnv === 'production' || getEnv('DATABASE_SSL') === 'true';
+    const dbPort = Number.parseInt(getEnv('DATABASE_PORT', '5453'), 10);
     
     return {
       type: 'postgres',
-      host: this.configService.get<string>('DATABASE_HOST') || 'localhost',
-      port: this.configService.get<number>('DATABASE_PORT') || 5453,
-      username: this.configService.get<string>('DATABASE_USER') || 'movie_user',
-      password: this.configService.get<string>('DATABASE_PASSWORD') || 'movie_password',
-      database: this.configService.get<string>('DATABASE_NAME') || 'movie_db',
+      host: getEnv('DATABASE_HOST', 'localhost'),
+      port: Number.isNaN(dbPort) ? 5453 : dbPort,
+      username: getEnv('DATABASE_USER', 'movie_user'),
+      password: getEnv('DATABASE_PASSWORD', 'movie_password'),
+      database: getEnv('DATABASE_NAME', 'movie_db'),
       entities: [User, Movie],
       synchronize: isDevelopment,
       logging: isDevelopment,
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
       extra: {
-        max: 20, // Maximum number of connections in the pool
-        min: 5, // Minimum number of connections in the pool
+        // Keep DB connections low in production/serverless to avoid exhausting limits.
+        max: isServerless ? 3 : poolSize.max,
+        min: isServerless ? 0 : poolSize.min,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
       },

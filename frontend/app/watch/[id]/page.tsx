@@ -1,13 +1,10 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { PageLoading } from '@/shared/components/PageLoading'
 
 const VideoPlayer = dynamic(() => import('@/features/video-player').then(mod => ({ default: mod.VideoPlayer })), {
-  loading: () => (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-white text-xl">Loading player...</div>
-    </div>
-  ),
+  loading: () => <PageLoading message="Đang tải trình phát..." />,
   ssr: false,
 })
 

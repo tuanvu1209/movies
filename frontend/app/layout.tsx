@@ -3,12 +3,14 @@ import { Inter } from 'next/font/google'
 import 'antd/dist/reset.css'
 import './globals.css'
 import { Providers } from '@/components/Providers'
+import { DocumentTitle } from '@/components/DocumentTitle'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Movie - Netflix-like Streaming',
-  description: 'Watch your favorite movies and shows',
+  title: 'BinPhim - Trang chủ',
+  description: 'Xem phim online siêu nét',
+  icons: { icon: '/logo.png' },
 }
 
 export default function RootLayout({
@@ -20,6 +22,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Providers>
+          <DocumentTitle />
           {children}
         </Providers>
       </body>

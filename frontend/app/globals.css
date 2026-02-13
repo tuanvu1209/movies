@@ -8,6 +8,26 @@
   }
 }
 
+/* Nav dropdown (antd) dark theme */
+.nav-dropdown-overlay.ant-dropdown .ant-dropdown-menu,
+.nav-dropdown-wrap .ant-dropdown-menu {
+  background: #1a1a1a !important;
+  border: none;
+  border-radius: 0;
+  padding: 4px 0;
+}
+.nav-dropdown-overlay .ant-dropdown-menu-item,
+.nav-dropdown-wrap .ant-dropdown-menu-item {
+  color: rgba(255, 255, 255, 0.9);
+}
+.nav-dropdown-overlay .ant-dropdown-menu-item:hover,
+.nav-dropdown-wrap .ant-dropdown-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.nav-dropdown-wrap .ant-dropdown-menu-item a {
+  color: inherit;
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;

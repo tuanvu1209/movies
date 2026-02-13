@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').trim()
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
@@ -51,6 +51,27 @@ export const getBluphimMovieInfo = async (url: string, episode?: number) => {
 
 export const getBluphimHomepage = async () => {
   const response = await api.get('/movies/homepage')
+  return response.data
+}
+
+export const getNav = async () => {
+  const response = await api.get('/nav')
+  return response.data
+}
+
+export const getCategory = async (slug: string, page: number = 1) => {
+  const params = new URLSearchParams()
+  if (page > 1) params.set('page', page.toString())
+  const q = params.toString()
+  const url = `/movies/category/${encodeURIComponent(slug)}${q ? `?${q}` : ''}`
+  const response = await api.get(url)
+  return response.data
+}
+
+export const getSearch = async (query: string) => {
+  const q = (query || '').trim()
+  if (q.length < 2) return []
+  const response = await api.get(`/movies/search?q=${encodeURIComponent(q)}`)
   return response.data
 }
 

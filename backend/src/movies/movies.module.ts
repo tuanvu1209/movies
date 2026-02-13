@@ -10,6 +10,6 @@ import { CacheService } from '../shared/cache/cache.service';
   imports: [BluphimModule],
   controllers: [MoviesController],
   providers: [MoviesService, MovieProviderFactory, BluphimProvider, CacheService],
-  exports: [MoviesService],
+  exports: [MoviesService, MovieProviderFactory],
 })
 export class MoviesModule {}

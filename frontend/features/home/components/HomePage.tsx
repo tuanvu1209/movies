@@ -3,6 +3,7 @@
 import { getBluphimHomepage } from '@/shared/lib/api'
 import { HomepageData } from '@/shared/types/homepage'
 import useSWR from 'swr'
+import { PageLoading } from '@/shared/components/PageLoading'
 import { HomeNavbar } from './HomeNavbar'
 import { MovieRow } from './MovieRow'
 import { useHomeNavigation } from '../hooks/useHomeNavigation'
@@ -28,17 +29,13 @@ export function HomePage() {
   const { getFocusedMovieRef, isFocused } = useHomeNavigation({ homepageData: homepageData || null })
 
   if (loadingMovies) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
-    )
+    return <PageLoading message="Đang tải trang chủ..." />
   }
 
   return (
     <div className="min-h-screen bg-black">
       <HomeNavbar />
-      <div className="pb-16 pt-16">
+      <div className="pb-16 pt-8">
         {homepageData &&
           homepageData.map((category, rowIndex) => (
             <MovieRow

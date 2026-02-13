@@ -1,0 +1,8 @@
+{
+  "name": "movies",
+  "private": true,
+  "scripts": {
+    "deploy:be": "npm run deploy --prefix backend",
+    "deploy:be:prod": "npm run deploy:prod --prefix backend"
+  }
+}

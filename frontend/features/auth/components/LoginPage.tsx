@@ -50,10 +50,11 @@ export function LoginPage() {
       <div className="relative z-10 w-full px-4 sm:px-8 md:px-12 lg:px-16 pt-4 sm:pt-6 pb-4">
         <Link href="/" className="inline-block relative h-8 w-24 sm:h-10 sm:w-32 z-10">
           <Image
-            src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg"
-            alt="Netflix"
+            src="/logo.png"
+            alt="Logo"
             fill
             className="object-contain"
+            sizes="128px"
           />
         </Link>
       </div>

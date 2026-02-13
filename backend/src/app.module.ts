@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { MoviesModule } from './movies/movies.module';
 import { AdminModule } from './admin/admin.module';
+import { NavModule } from './nav/nav.module';
 import { DatabaseConfig } from './config/database.config';
 
 @Module({
@@ -22,6 +23,7 @@ import { DatabaseConfig } from './config/database.config';
     UsersModule,
     MoviesModule,
     AdminModule,
+    NavModule,
   ],
   controllers: [AppController],
   providers: [AppService],

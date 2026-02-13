@@ -13,11 +13,13 @@ interface MovieRowProps {
   title: string
   movies: MovieRowItem[]
   rowIndex: number
+  /** true = horizontal scroll (homepage), false = grid layout (category) */
+  isScroll?: boolean
   getFocusedMovieRef?: (rowIndex: number, movieIndex: number) => ((ref: HTMLDivElement | null) => void) | undefined
   isFocused?: (rowIndex: number, movieIndex: number) => boolean
 }
 
-function MovieRowComponent({ title, movies, rowIndex, getFocusedMovieRef, isFocused }: MovieRowProps) {
+function MovieRowComponent({ title, movies, rowIndex, isScroll = true, getFocusedMovieRef, isFocused }: MovieRowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -64,77 +66,82 @@ function MovieRowComponent({ title, movies, rowIndex, getFocusedMovieRef, isFocu
     return null
   }
 
+  const cardContent = (movie: typeof processedMovies[0], index: number) => {
+    const focused = isFocused ? isFocused(rowIndex, index) : false
+    const refCallback = getFocusedMovieRef ? getFocusedMovieRef(rowIndex, index) : undefined
+    return (
+      <div
+        key={movie.movieId}
+        ref={refCallback}
+        onClick={() => handleMovieClick(movie.url)}
+        tabIndex={focused ? 0 : -1}
+        className={`relative group/item flex flex-col overflow-hidden rounded cursor-pointer transition-all duration-200 ${isScroll ? 'flex-shrink-0 w-[202px]' : ''}`}
+      >
+        <div className={`relative overflow-hidden rounded ${isScroll ? 'w-[200px] h-[300px] mx-2 my-2' : 'w-full aspect-[2/3]'}`} style={{ outline: focused ? '2px solid #ff00fb' : 'none', margin: isScroll ? '2px' : 0 }}>
+          <Image
+            src={movie.thumbnail}
+            alt={movie.title}
+            width={200}
+            height={300}
+            className="object-cover rounded transition group-hover/item:scale-110 w-full h-full"
+            loading="lazy"
+            placeholder="blur"
+            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+          />
+          {movie.viewCount > 0 && (
+            <span className="absolute bottom-2 left-2 p-2 bg-black/60 text-white text-xs font-semibold rounded">
+              {movie.viewCount} views
+            </span>
+          )}
+          {movie.episode && (
+            <span className="absolute bottom-2 right-2 p-2 bg-green-500 text-white text-xs font-semibold rounded">
+              {movie.episode}
+            </span>
+          )}
+        </div>
+        <div className="absolute inset-0 bg-black/0 group-hover/item:bg-black/30 transition" />
+
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {movie.quality && (
+            <span className="px-2 py-0.5 bg-red-600 text-white text-xs font-semibold rounded">
+              {movie.quality}
+            </span>
+          )}
+        </div>
+
+        <div className="p-2">
+          <p className="text-white text-sm font-semibold truncate w-full max-w-[200px]">
+            {movie.title}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="mb-8">
       <h2 className="text-2xl font-bold mb-4 px-8">{title}</h2>
       <div className="relative group">
-        <FaChevronLeft
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 rounded-full p-2 w-10 h-10 cursor-pointer opacity-0 group-hover:opacity-100 transition"
-          onClick={scrollLeft}
-        />
+        {isScroll && (
+          <>
+            <FaChevronLeft
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 rounded-full p-2 w-10 h-10 cursor-pointer opacity-0 group-hover:opacity-100 transition"
+              onClick={scrollLeft}
+            />
+            <FaChevronRight
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 rounded-full p-2 w-10 h-10 cursor-pointer opacity-0 group-hover:opacity-100 transition"
+              onClick={scrollRight}
+            />
+          </>
+        )}
         <div
           ref={rowRef}
-          className="flex gap-4 overflow-x-scroll scrollbar-hide px-8"
+          className={`px-8 ${isScroll ? 'flex gap-4 overflow-x-scroll scrollbar-hide' : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4'}`}
         >
-          {processedMovies.map((movie, index) => {
-            const focused = isFocused ? isFocused(rowIndex, index) : false
-            const refCallback = getFocusedMovieRef ? getFocusedMovieRef(rowIndex, index) : undefined
-
-            return (
-              <div
-                key={movie.movieId}
-                ref={refCallback}
-                onClick={() => handleMovieClick(movie.url)}
-                tabIndex={focused ? 0 : -1}
-                className={`flex-shrink-0 relative w-[202px] group/item flex flex-col overflow-hidden rounded cursor-pointer transition-all duration-200`}
-              >
-                <div className="w-[200px] h-[300px] relative overflow-hidden mx-2 my-2 rounded" style={{ outline: focused ? '2px solid #ff00fb' : 'none', margin: '2px' }}>
-                  <Image
-                    src={movie.thumbnail}
-                    alt={movie.title}
-                    width={200}
-                    height={300}
-                    className="object-cover rounded transition group-hover/item:scale-110 w-[200px] h-[300px]"
-                    loading="lazy"
-                    placeholder="blur"
-                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-                  />
-                  {movie.viewCount > 0 && (
-                    <span className="absolute bottom-2 left-2 p-2 bg-black/60 text-white text-xs font-semibold rounded">
-                      {movie.viewCount} views
-                    </span>
-                  )}
-                  {movie.episode && (
-                    <span className="absolute bottom-2 right-2 p-2 bg-green-500 text-white text-xs font-semibold rounded">
-                      {movie.episode}
-                    </span>
-                  )}
-                </div>
-                <div className="absolute inset-0 bg-black/0 group-hover/item:bg-black/30 transition" />
-
-                <div className="absolute top-2 left-2 flex flex-col gap-1">
-                  {movie.quality && (
-                    <span className="px-2 py-0.5 bg-red-600 text-white text-xs font-semibold rounded">
-                      {movie.quality}
-                    </span>
-                  )}
-                </div>
-
-                <div className="p-2">
-                  <p className="text-white text-sm font-semibold truncate w-[200px]">
-                    {movie.title}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
+          {processedMovies.map((movie, index) => cardContent(movie, index))}
         </div>
-        <FaChevronRight
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-white bg-black/50 rounded-full p-2 w-10 h-10 cursor-pointer opacity-0 group-hover:opacity-100 transition"
-          onClick={scrollRight}
-        />
       </div>
-    </div >
+    </div>
   )
 }
 

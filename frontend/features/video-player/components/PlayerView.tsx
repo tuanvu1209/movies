@@ -1,4 +1,5 @@
 import ReactPlayer from 'react-player'
+import { PageLoading } from '@/shared/components/PageLoading'
 
 interface PlayerViewProps {
   videoUrl: string
@@ -21,11 +22,8 @@ export function PlayerView({
 }: PlayerViewProps) {
   if (!videoUrl) {
     return (
-      <div className="flex items-center justify-center h-full bg-gray-900 text-white">
-        <div className="text-center">
-          <p className="text-xl mb-2">Chưa có video URL</p>
-          <p className="text-sm text-gray-400">Đang tìm kiếm m3u8 URL...</p>
-        </div>
+      <div className="h-full min-h-[50vh]">
+        <PageLoading fullScreen={false} message="Đang tìm kiếm m3u8 URL..." />
       </div>
     )
   }

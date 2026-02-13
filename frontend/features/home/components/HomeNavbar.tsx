@@ -1,16 +1,72 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { Dropdown, Input } from 'antd'
+import type { MenuProps } from 'antd'
+import { DownOutlined, SearchOutlined } from '@ant-design/icons'
 import { useAuth } from '@/features/auth'
 import { useRouter } from 'next/navigation'
+import useSWR from 'swr'
+import { getNav, getSearch } from '@/shared/lib/api'
+import type { NavItem } from '@/shared/types/nav'
+import type { SearchResult } from '@/shared/types/search'
+
+const NAV_FETCHER = async () => {
+  const data = await getNav().catch(() => [])
+  return data as NavItem[]
+}
+
+const SEARCH_DEBOUNCE_MS = 300
+
+/** Lấy slug từ url (vd: https://bluphim.me/phim-bo/ -> phim-bo) */
+function getSlugFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname.replace(/^\/|\/$/g, '')
+    return path || ''
+  } catch {
+    return ''
+  }
+}
+
+function isHomeUrl(url: string): boolean {
+  const slug = getSlugFromUrl(url)
+  return !slug || slug === ''
+}
 
 export function HomeNavbar() {
   const { user, logout } = useAuth()
   const router = useRouter()
-  const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
 
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setDebouncedQuery('')
+      return
+    }
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [searchQuery])
+
+  const searchKey = useMemo(
+    () => (debouncedQuery.length >= 2 ? `search-${debouncedQuery}` : null),
+    [debouncedQuery]
+  )
+
+  const { data: searchSuggestions = [], isValidating: searchLoading } = useSWR<SearchResult[]>(
+    searchKey,
+    () => getSearch(debouncedQuery),
+    { revalidateOnFocus: false, dedupingInterval: 5000, keepPreviousData: true }
+  )
+
+  const showSuggest = searchQuery.trim().length >= 2
+
+  const { data: navItems = [] } = useSWR<NavItem[]>('nav', NAV_FETCHER, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  })
 
   const handleLogout = () => {
     logout()
@@ -18,101 +74,61 @@ export function HomeNavbar() {
   }
 
   return (
-    <nav
-      className={`fixed top-0 w-full z-50 transition-all duration-300 bg-black`}
-    >
-      <div className="flex items-center justify-between px-4 sm:px-8 py-4">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="relative h-6 w-20 sm:h-8 sm:w-28 flex-shrink-0">
-            <span className="text-red-600 text-3xl font-bold">BinPhim</span>
-          </Link>
+    <nav className="w-full z-50 transition-all duration-300 bg-black border-b border-white/10">
+      {/* Hàng trên: Logo + Search + User */}
+      <div className="flex items-center justify-between gap-4 px-4 sm:px-8 py-3">
+        <Link href="/" className="relative h-16 w-16 flex-shrink-0 block">
+          <Image src="/logo.png" alt="Logo" fill className="object-cover" />
+        </Link>
 
-          <div className="hidden lg:flex items-center gap-6">
-            <Link href="/" className="text-sm font-medium text-white hover:text-gray-300 transition">
-              Home
-            </Link>
-            <Link href="/" className="text-sm font-medium text-gray-300 hover:text-white transition">
-              TV Shows
-            </Link>
-            <Link href="/" className="text-sm font-medium text-gray-300 hover:text-white transition">
-              Movies
-            </Link>
-            <Link href="/" className="text-sm font-medium text-gray-300 hover:text-white transition">
-              New & Popular
-            </Link>
-            <Link href="/" className="text-sm font-medium text-gray-300 hover:text-white transition">
-              My List
-            </Link>
-            <Link href="/" className="text-sm font-medium text-gray-300 hover:text-white transition">
-              Browse by Languages
-            </Link>
-          </div>
+        <div className="relative flex-1 max-w-xl">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm kiếm"
+            allowClear
+            suffix={<SearchOutlined className="text-white/50" />}
+            className="[&_.ant-input]:bg-white/10 [&_.ant-input]:border-white/20 [&_.ant-input]:text-white [&_.ant-input]:placeholder:text-gray-400 [&_.ant-input:hover]:border-white/30 [&_.ant-input-focused]:border-white/40 [&_.ant-input]:rounded-full [&_.ant-input-clear-icon]:text-white/70 [&_.ant-input-clear-icon:hover]:text-white [&_.ant-input-suffix]:ml-2"
+          />
+          {showSuggest && (
+            <div className="absolute left-0 right-0 top-full mt-1 max-h-80 overflow-y-auto bg-black border border-white/20 rounded-lg shadow-xl z-[100]">
+              {searchLoading ? (
+                <div className="px-4 py-3 text-sm text-gray-400">Đang tìm...</div>
+              ) : searchSuggestions.length > 0 ? (
+                <ul className="py-2">
+                  {searchSuggestions.map((item) => (
+                    <li key={item.url}>
+                      <Link
+                        href={`/watch/${item.url}`}
+                        onClick={() => setSearchQuery('')}
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-white/10 transition text-left"
+                      >
+                        {item.thumbnail ? (
+                          <div className="w-10 h-14 relative flex-shrink-0 rounded overflow-hidden bg-gray-800">
+                            <Image
+                              src={item.thumbnail}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-14 flex-shrink-0 rounded bg-gray-800" />
+                        )}
+                        <span className="text-white text-sm truncate flex-1">{item.title}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="px-4 py-3 text-sm text-gray-400">Không tìm thấy</div>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            {showSearch ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Titles, people, genres"
-                  className="bg-black/80 border border-white/30 px-4 py-1.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:border-white/60 transition w-64"
-                  autoFocus
-                />
-                <button
-                  onClick={() => {
-                    setShowSearch(false)
-                    setSearchQuery('')
-                  }}
-                  className="text-white hover:text-gray-300 transition"
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowSearch(true)}
-                className="text-white hover:text-gray-300 transition"
-                aria-label="Search"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          <button
-            className="text-white hover:text-gray-300 transition hidden sm:block"
-            aria-label="Notifications"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-          </button>
-
+        <div className="flex items-center gap-2 flex-shrink-0">
           {user ? (
             <div className="relative group">
               <button className="flex items-center gap-2">
@@ -168,6 +184,70 @@ export function HomeNavbar() {
               Sign In
             </Link>
           )}
+        </div>
+      </div>
+
+      {/* Hàng dưới: Nav */}
+      <div className="border-t border-white/10">
+        <div className="flex flex-wrap items-center justify-center gap-6 px-4 sm:px-8 py-3">
+          {navItems.map((item) => {
+            if (item.children?.length) {
+              const menuItems: MenuProps['items'] = item.children
+                .map((child) => {
+                  const slug = getSlugFromUrl(child.url)
+                  if (!slug) return null
+                  return {
+                    key: slug,
+                    label: <Link href={`/category/${slug}`}>{child.title}</Link>,
+                  }
+                })
+                .filter(Boolean) as MenuProps['items']
+              return (
+                <Dropdown
+                  key={item.title}
+                  menu={{ items: menuItems }}
+                  trigger={['hover']}
+                  placement="bottom"
+                  overlayClassName="nav-dropdown-overlay"
+                  dropdownRender={(menuNode) => (
+                    <div className="nav-dropdown-wrap min-w-[180px] rounded-lg shadow-xl border border-white/10 overflow-hidden bg-[#1a1a1a]">
+                      <div className="px-3 py-2 border-b border-white/10 text-xs font-semibold text-white/70 uppercase tracking-wide">
+                        {item.title}
+                      </div>
+                      {menuNode}
+                    </div>
+                  )}
+                >
+                  <button className="text-sm font-semibold text-white uppercase tracking-wide hover:text-gray-300 transition flex items-center gap-1 py-1">
+                    {item.title}
+                    <DownOutlined className="text-[10px]" />
+                  </button>
+                </Dropdown>
+              )
+            }
+            if (isHomeUrl(item.url)) {
+              return (
+                <Link
+                  key={item.title}
+                  href="/"
+                  className="text-sm font-semibold text-white uppercase tracking-wide hover:text-gray-300 transition"
+                >
+                  {item.title}
+                </Link>
+              )
+            }
+            const slug = getSlugFromUrl(item.url)
+            if (!slug) return null
+            return (
+              <Link
+                key={item.title}
+                href={`/category/${slug}`}
+                className="text-sm font-semibold text-white uppercase tracking-wide hover:text-gray-300 transition"
+              >
+                {item.title}
+              </Link>
+            )
+          })}
         </div>
       </div>
     </nav>

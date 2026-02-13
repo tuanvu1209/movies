@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { HomepageData, HomepageMovie } from '../shared/types/homepage.types';
+import { CategoryPageResult, CategoryPagination } from '../shared/types/category.types';
 
 export interface Category {
   name: string;
@@ -19,8 +20,122 @@ export class BluphimHomepageService {
   }
 
   async getHomepageData(): Promise<HomepageData | null> {
+    return this.getPageData(this.baseUrl);
+  }
+
+  /** Lấy dữ liệu trang category (phim-bo, phim-le, ...), có phân trang phim-bo/page/2/. */
+  async getCategoryData(slug: string, page: number = 1): Promise<CategoryPageResult | null> {
+    const path = slug.replace(/^\//, '').replace(/\/$/, '');
+    if (!path) return null;
+    const url = page > 1 ? `${this.baseUrl}/${path}/page/${page}/` : `${this.baseUrl}/${path}/`;
+    return this.getCategoryPageData(url);
+  }
+
+  private async getCategoryPageData(url: string): Promise<CategoryPageResult | null> {
     try {
-      const response = await axios.get(this.baseUrl, {
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+        timeout: 30000,
+      });
+
+      const $ = cheerio.load(response.data);
+      const sections: HomepageData = [];
+
+      const categoryTitle = $('h1').first().text().trim() || 'Danh sách phim';
+
+      const $moviesGrid = $('.movies-grid');
+      if ($moviesGrid.length) {
+        const movies = this.extractMoviesFromContainer($, $moviesGrid.first(), 0);
+        if (movies.length > 0) {
+          sections.push({ title: categoryTitle, data: movies });
+        }
+      }
+
+      const pagination = this.parsePagination($);
+
+      if (sections.length === 0 && !pagination) return null;
+      return {
+        data: sections.length > 0 ? sections : [],
+        ...(pagination && { pagination }),
+      };
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error scraping bluphim category:', url, error);
+      }
+      return null;
+    }
+  }
+
+  /** Parse nav.navigation.pagination .nav-links để lấy currentPage, totalPages, prev, next. */
+  private parsePagination($: cheerio.CheerioAPI): CategoryPagination | null {
+    const $nav = $('.navigation.pagination .nav-links');
+    if (!$nav.length) return null;
+
+    let currentPage = 1;
+    let totalPages = 1;
+    let prevPage: number | null = null;
+    let nextPage: number | null = null;
+    const pageNumbers: number[] = [];
+
+    const extractPageFromHref = (href: string): number | null => {
+      const match = href.match(/\/page\/(\d+)\/?/);
+      return match ? parseInt(match[1], 10) : null;
+    };
+
+    $nav.find('a.page-numbers, span.page-numbers').each((_, el) => {
+      const $el = $(el);
+      const href = $el.attr('href') || '';
+      const text = $el.text().trim();
+
+      if ($el.hasClass('current')) {
+        const n = parseInt(text, 10);
+        if (!isNaN(n)) currentPage = n;
+        return;
+      }
+      if ($el.hasClass('dots')) return;
+      if ($el.hasClass('prev')) {
+        const n = extractPageFromHref(href);
+        if (n != null) prevPage = n;
+        return;
+      }
+      if ($el.hasClass('next')) {
+        const n = extractPageFromHref(href);
+        if (n != null) nextPage = n;
+        return;
+      }
+      const n = parseInt(text, 10);
+      if (!isNaN(n)) pageNumbers.push(n);
+      else {
+        const fromHref = extractPageFromHref(href);
+        if (fromHref != null) pageNumbers.push(fromHref);
+      }
+    });
+
+    if (pageNumbers.length > 0) {
+      totalPages = Math.max(totalPages, ...pageNumbers);
+    }
+    if (prevPage == null && currentPage > 1) {
+      prevPage = currentPage - 1;
+    }
+    if (nextPage == null && currentPage < totalPages) {
+      nextPage = currentPage + 1;
+    }
+
+    return {
+      currentPage,
+      totalPages,
+      prevPage: prevPage && prevPage >= 1 ? prevPage : null,
+      nextPage: nextPage && nextPage <= totalPages ? nextPage : null,
+    };
+  }
+
+  private async getPageData(url: string): Promise<HomepageData | null> {
+    try {
+      const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -53,17 +168,28 @@ export class BluphimHomepageService {
           }
         }
 
-        const movies = this.extractMoviesFromContainer($, $moviesContainer);
+        const movies = this.extractMoviesFromContainer($, $moviesContainer, 20);
 
         if (movies.length > 0) {
           sections.push({ title: sectionTitle, data: movies });
         }
       });
 
+      // Trang category: không có .section-title-main, chỉ có .movies-grid với .movie-card-2
+      if (sections.length === 0) {
+        const $moviesGrid = $('.movies-grid');
+        if ($moviesGrid.length) {
+          const movies = this.extractMoviesFromContainer($, $moviesGrid.first(), 0);
+          if (movies.length > 0) {
+            sections.push({ title: 'Danh sách phim', data: movies });
+          }
+        }
+      }
+
       return sections.length > 0 ? sections : null;
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
-      console.error('Error scraping bluphim homepage:', error);
+        console.error('Error scraping bluphim page:', url, error);
       }
       return null;
     }
@@ -74,7 +200,7 @@ export class BluphimHomepageService {
     const seenUrls = new Set<string>();
 
     $container.find('.movie-card-2').each((_, cardEl) => {
-      if (movies.length >= limit) return false;
+      if (limit > 0 && movies.length >= limit) return false;
 
       const $card = $(cardEl);
       const movie = this.extractMovieFromCard($, $card);

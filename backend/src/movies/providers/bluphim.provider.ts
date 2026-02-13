@@ -13,4 +13,16 @@ export class BluphimProvider implements IVideoProvider {
   async getHomepage(): Promise<VideoProviderHomepageData | null> {
     return this.bluphimService.getHomepage();
   }
+
+  async getCategoryData(slug: string, page?: number) {
+    return this.bluphimService.getCategoryData(slug, page ?? 1);
+  }
+
+  async getSearch(query: string) {
+    return this.bluphimService.getSearch(query);
+  }
+
+  async getNav() {
+    return this.bluphimService.getNav();
+  }
 }

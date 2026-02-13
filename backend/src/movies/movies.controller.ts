@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Query,
+  Param,
   NotFoundException,
   Header,
   Res,
@@ -23,6 +24,47 @@ export class MoviesController {
       throw new NotFoundException('Could not fetch homepage data');
     }
     return res.json(data);
+  }
+
+  @Get('category')
+  @Header('Cache-Control', 'public, max-age=300')
+  async getCategoryByQuery(
+    @Query('slug') slug: string,
+    @Query('page') pageStr: string,
+    @Res() res: Response,
+  ) {
+    if (!slug) {
+      throw new NotFoundException('slug is required');
+    }
+    const page = pageStr ? Math.max(1, parseInt(pageStr, 10) || 1) : 1;
+    const result = await this.moviesService.getCategoryData(slug, page);
+    return res.json(result ?? { data: [], pagination: undefined });
+  }
+
+  @Get('category/:slug')
+  @Header('Cache-Control', 'public, max-age=300')
+  async getCategoryBySlug(
+    @Param('slug') slug: string,
+    @Query('page') pageStr: string,
+    @Res() res: Response,
+  ) {
+    const page = pageStr ? Math.max(1, parseInt(pageStr, 10) || 1) : 1;
+    const result = await this.moviesService.getCategoryData(slug, page);
+    return res.json(result ?? { data: [], pagination: undefined });
+  }
+
+  @Get('search')
+  @Header('Cache-Control', 'public, max-age=120')
+  async getSearch(
+    @Query('q') q: string,
+    @Res() res: Response,
+  ) {
+    const query = (q ?? '').trim();
+    if (query.length < 2) {
+      return res.json([]);
+    }
+    const results = await this.moviesService.getSearch(query);
+    return res.json(results);
   }
 
   @Get('info')

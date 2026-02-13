@@ -29,6 +29,8 @@ services:
       JWT_EXPIRES_IN: 7d
       PORT: 3001
       FRONTEND_URL: http://localhost:3201
+      # Bật polling để container nhận thay đổi file từ host (Windows/Mac)
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "3001:3001"
     depends_on:
@@ -48,6 +50,8 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:3001
       PORT: 3201
+      # Bật polling để container nhận thay đổi file từ host (Windows/Mac)
+      WATCHPACK_POLLING: "true"
     ports:
       - "3201:3201"
     depends_on:
