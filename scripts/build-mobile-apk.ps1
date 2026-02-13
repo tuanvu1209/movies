@@ -7,7 +7,8 @@
 # long paths: Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1
 
 param(
-    [switch]$SkipPrebuild  # Skip prebuild if android/ already exists and is up to date
+    [switch]$SkipPrebuild,  # Skip prebuild if android/ already exists and is up to date
+    [switch]$NoSubst        # Do not use subst drive (avoids "different roots" in Gradle/codegen; may hit 260-char path limit)
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,7 +23,7 @@ $apkDest = $null   # set below after $appName, $version
 # (full build paths like .cxx\...\node_modules\react-native-safe-area-context\... exceed 260 chars)
 $substDrive = $null
 $isWindows = $IsWindows -or $env:OS -match "Windows"
-if ($isWindows) {
+if ($isWindows -and -not $NoSubst) {
     $usedDrives = Get-PSDrive -PSProvider FileSystem | ForEach-Object { $_.Name }
     foreach ($driveLetter in @("W", "X", "Y")) {
         if ($usedDrives -notcontains $driveLetter) {

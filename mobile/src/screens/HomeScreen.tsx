@@ -1,22 +1,39 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { HomeHeader } from "../components/HomeHeader";
 import { MovieRow } from "../components/MovieRow";
 import { PageLoading } from "../components/PageLoading";
 import { colors } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { getApiErrorMessage, getBluphimHomepage } from "../lib/api";
+import { getWatchProgressList } from "../lib/watchProgress";
+import type { WatchProgress } from "../lib/watchProgress";
 import { RootStackParamList } from "../navigation/types";
 import { HomepageData, HomepageMovie } from "../types/homepage";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
+type ContinueMovie = HomepageMovie & { _episode: number };
+
 export function HomeScreen({ navigation }: Props) {
   const { user, logout } = useAuth();
   const [homepageData, setHomepageData] = useState<HomepageData>([]);
+  const [continueList, setContinueList] = useState<WatchProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const loadContinueList = useCallback(async () => {
+    const list = await getWatchProgressList();
+    setContinueList(list);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadContinueList();
+    }, [loadContinueList])
+  );
 
   useEffect(() => {
     async function loadHomepage() {
@@ -43,6 +60,16 @@ export function HomeScreen({ navigation }: Props) {
     [navigation],
   );
 
+  const handleContinueSelect = useCallback(
+    (movie: ContinueMovie) => {
+      navigation.navigate("Watch", {
+        id: movie.url,
+        episode: movie._episode,
+      });
+    },
+    [navigation],
+  );
+
   return (
     <View style={styles.root}>
       <HomeHeader
@@ -62,6 +89,22 @@ export function HomeScreen({ navigation }: Props) {
         <FlatList
           data={homepageData}
           keyExtractor={(item) => item.title}
+          ListHeaderComponent={
+            continueList.length > 0 ? (
+              <MovieRow
+                title="Tiếp tục xem"
+                movies={continueList.map((item): ContinueMovie => ({
+                  url: item.movieId,
+                  title: item.title ?? "Phim",
+                  thumbnail: item.thumbnail ?? "",
+                  episode: `Tập ${item.episode}`,
+                  _episode: item.episode,
+                }))}
+                onSelectMovie={handleContinueSelect as (m: HomepageMovie) => void}
+                autoFocusFirstItem={true}
+              />
+            ) : null
+          }
           renderItem={({ item, index }) => (
             <MovieRow
               title={item.title}

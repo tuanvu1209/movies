@@ -14,6 +14,7 @@ import { FocusablePressable } from "../components/FocusablePressable";
 import { PageLoading } from "../components/PageLoading";
 import { colors, focusOutline } from "../constants/theme";
 import { getApiErrorMessage, getBluphimMovieInfo } from "../lib/api";
+import { getWatchProgress, saveWatchProgress } from "../lib/watchProgress";
 import { RootStackParamList } from "../navigation/types";
 import { MovieInfo } from "../types/video";
 
@@ -35,6 +36,7 @@ export function WatchScreen({ navigation, route }: Props) {
   const [focusAnchor, setFocusAnchor] = useState(0);
   const [showTitle, setShowTitle] = useState(true);
   const hideTitleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedProgressRef = useRef<{ episode: number; currentTimeSeconds: number } | null>(null);
   const player = useVideoPlayer(null);
   const episodes = movieInfo?.episodes || [];
 
@@ -58,6 +60,20 @@ export function WatchScreen({ navigation, route }: Props) {
       }
     };
   }, []);
+
+  // Khôi phục tập + thời gian đã xem từ bộ nhớ (nếu có)
+  useEffect(() => {
+    const movieId = route.params.id;
+    const episodeFromParams = route.params.episode;
+    getWatchProgress(movieId).then((progress) => {
+      if (!progress) return;
+      savedProgressRef.current = progress;
+      if (episodeFromParams == null) {
+        setSelectedEpisode(progress.episode);
+        setHighlightedEpisode(progress.episode);
+      }
+    });
+  }, [route.params.id, route.params.episode]);
 
   useEffect(() => {
     async function loadMovie() {
@@ -89,6 +105,15 @@ export function WatchScreen({ navigation, route }: Props) {
           contentType: "hls",
         });
         if (!cancelled) {
+          const saved = savedProgressRef.current;
+          if (saved && saved.episode === selectedEpisode && saved.currentTimeSeconds > 0) {
+            try {
+              player.currentTime = saved.currentTimeSeconds;
+            } catch {
+              // Ignore seek errors
+            }
+            savedProgressRef.current = null;
+          }
           player.play();
         }
       } catch {
@@ -103,11 +128,53 @@ export function WatchScreen({ navigation, route }: Props) {
       // `useVideoPlayer` manages lifecycle and releases native resources itself.
       // Calling pause during cleanup can race with release in Expo Go (shared object error).
     };
-  }, [movieInfo?.m3u8Url, player]);
+  }, [movieInfo?.m3u8Url, player, selectedEpisode]);
 
   useEffect(() => {
     setHighlightedEpisode(selectedEpisode);
   }, [selectedEpisode]);
+
+  // Lưu tiến độ xem: lần đầu vào page, mỗi 10 giây, và khi thoát (kèm list cho homepage)
+  const movieId = route.params.id;
+  useEffect(() => {
+    if (!movieInfo?.m3u8Url || !movieId) return;
+    const meta = {
+      title: movieInfo.title,
+      thumbnail: movieInfo.thumbnail,
+      videoThumbnail: movieInfo.backdrop,
+    };
+    // Lần đầu vào page: lưu ngay để phim xuất hiện ở "Tiếp tục xem"
+    try {
+      const time = player.currentTime;
+      if (Number.isFinite(time)) {
+        void saveWatchProgress(movieId, selectedEpisode, time, meta);
+      }
+    } catch {
+      // Ignore
+    }
+    const SAVE_INTERVAL_MS = 10_000;
+    const intervalId = setInterval(() => {
+      try {
+        const time = player.currentTime;
+        if (Number.isFinite(time)) {
+          void saveWatchProgress(movieId, selectedEpisode, time, meta);
+        }
+      } catch {
+        // Player có thể đã release
+      }
+    }, SAVE_INTERVAL_MS);
+    return () => {
+      clearInterval(intervalId);
+      try {
+        const time = player.currentTime;
+        if (Number.isFinite(time)) {
+          void saveWatchProgress(movieId, selectedEpisode, time, meta);
+        }
+      } catch {
+        // Ignore khi unmount
+      }
+    };
+  }, [movieId, movieInfo?.m3u8Url, movieInfo?.title, movieInfo?.thumbnail, movieInfo?.backdrop, selectedEpisode, player]);
 
   useEffect(() => {
     if (!movieInfo?.m3u8Url) return;

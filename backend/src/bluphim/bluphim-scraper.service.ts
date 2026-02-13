@@ -5,6 +5,7 @@ import * as cheerio from 'cheerio';
 
 export interface BluphimMovieInfo {
   title: string;
+  thumbnail: string;
   m3u8Url: string;
   episodes: Array<{
     episode: number;
@@ -58,6 +59,7 @@ export class BluphimScraperService {
 
       return {
         title,
+        thumbnail: $('meta[property="og:image"]').attr('content') || '',
         m3u8Url,
         episodes,
       };
