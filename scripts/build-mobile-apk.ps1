@@ -1,14 +1,9 @@
 # Build APK for mobile app and output to mobile/build
 # Usage: .\scripts\build-mobile-apk.ps1
 # Requires: Node.js, JDK 17+, Android SDK (ANDROID_HOME)
-#
-# On Windows, if you see "Filename longer than 260 characters" (CMake/Ninja),
-# this script uses a subst drive (W:) to shorten paths. Alternatively enable
-# long paths: Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1
 
 param(
-    [switch]$SkipPrebuild,  # Skip prebuild if android/ already exists and is up to date
-    [switch]$NoSubst        # Do not use subst drive (avoids "different roots" in Gradle/codegen; may hit 260-char path limit)
+    [switch]$SkipPrebuild  # Skip prebuild if android/ already exists and is up to date
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,25 +14,13 @@ $buildDir = Join-Path $mobileDir "build"
 $androidDir = Join-Path $mobileDir "android"
 $apkDest = $null   # set below after $appName, $version
 
-# On Windows, use a subst drive to avoid CMake/Ninja "path > 260 chars" errors
-# (full build paths like .cxx\...\node_modules\react-native-safe-area-context\... exceed 260 chars)
-$substDrive = $null
+# On Windows, set ANDROID_HOME if not set (default Android Studio SDK path)
 $isWindows = $IsWindows -or $env:OS -match "Windows"
-if ($isWindows -and -not $NoSubst) {
-    $usedDrives = Get-PSDrive -PSProvider FileSystem | ForEach-Object { $_.Name }
-    foreach ($driveLetter in @("W", "X", "Y")) {
-        if ($usedDrives -notcontains $driveLetter) {
-            subst "${driveLetter}:" $repoRoot
-            $substDrive = "${driveLetter}:"
-            $mobileDir = "${driveLetter}:\mobile"
-            $buildDir = "${driveLetter}:\mobile\build"
-            $androidDir = "${driveLetter}:\mobile\android"
-            Write-Host "Using $substDrive\ to shorten paths (avoids 260-char limit)." -ForegroundColor Gray
-            break
-        }
-    }
-    if (-not $substDrive) {
-        Write-Host "Warning: Could not create subst (W:, X:, Y: in use). Build may fail with path > 260 chars." -ForegroundColor Yellow
+if ($isWindows -and -not $env:ANDROID_HOME) {
+    $defaultSdk = Join-Path $env:LOCALAPPDATA "Android\Sdk"
+    if (Test-Path $defaultSdk) {
+        $env:ANDROID_HOME = $defaultSdk
+        Write-Host "Set ANDROID_HOME = $defaultSdk" -ForegroundColor Gray
     }
 }
 
@@ -88,13 +71,9 @@ try {
     Copy-Item -Path $gradleApk -Destination $apkDest -Force
     Write-Host "`n[3/3] Copied APK to build folder." -ForegroundColor Yellow
 
-    $apkDisplayPath = if ($substDrive) { Join-Path $repoRoot "mobile\build\$appName-$version.apk" } else { (Resolve-Path $apkDest).Path }
+    $apkDisplayPath = (Resolve-Path $apkDest).Path
     Write-Host "`nDone. APK: mobile\build\$($appName)-${version}.apk" -ForegroundColor Green
     Write-Host "Full path: $apkDisplayPath" -ForegroundColor Gray
 } finally {
     Pop-Location
-    if ($substDrive) {
-        subst $substDrive /D
-        Write-Host "Removed subst $substDrive" -ForegroundColor Gray
-    }
 }

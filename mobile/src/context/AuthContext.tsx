@@ -23,13 +23,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const savedToken = await AsyncStorage.getItem("token");
         if (!savedToken) {
+          await AsyncStorage.removeItem("sessionToken");
           return;
         }
         const profile = await getProfile(savedToken);
         setToken(savedToken);
         setUser(profile);
       } catch {
-        await AsyncStorage.multiRemove(["token", "rememberMe"]);
+        await AsyncStorage.multiRemove(["token", "rememberMe", "sessionToken"]);
       } finally {
         setLoading(false);
       }
@@ -41,18 +42,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async (params: { user: User; token: string; rememberMe?: boolean }) => {
     setUser(params.user);
     setToken(params.token);
-    await AsyncStorage.setItem("token", params.token);
     if (params.rememberMe) {
+      await AsyncStorage.setItem("token", params.token);
       await AsyncStorage.setItem("rememberMe", "true");
+      await AsyncStorage.removeItem("sessionToken");
     } else {
       await AsyncStorage.removeItem("rememberMe");
+      await AsyncStorage.setItem("sessionToken", params.token);
+      // Không lưu "token" → restoreSession không load → đăng xuất khi tắt app (session only)
     }
   }, []);
 
   const logout = useCallback(async () => {
     setUser(null);
     setToken(null);
-    await AsyncStorage.multiRemove(["token", "rememberMe"]);
+    await AsyncStorage.multiRemove(["token", "rememberMe", "sessionToken"]);
   }, []);
 
   const value = useMemo<AuthContextValue>(

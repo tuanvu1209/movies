@@ -142,6 +142,7 @@ export function WatchScreen({ navigation, route }: Props) {
       title: movieInfo.title,
       thumbnail: movieInfo.thumbnail,
       videoThumbnail: movieInfo.backdrop,
+      durationSeconds: Number.isFinite(player.duration) ? player.duration : undefined,
     };
     // Lần đầu vào page: lưu ngay để phim xuất hiện ở "Tiếp tục xem"
     try {
@@ -156,8 +157,9 @@ export function WatchScreen({ navigation, route }: Props) {
     const intervalId = setInterval(() => {
       try {
         const time = player.currentTime;
+        const duration = Number.isFinite(player.duration) ? player.duration : undefined;
         if (Number.isFinite(time)) {
-          void saveWatchProgress(movieId, selectedEpisode, time, meta);
+          void saveWatchProgress(movieId, selectedEpisode, time, { ...meta, durationSeconds: duration });
         }
       } catch {
         // Player có thể đã release
@@ -167,8 +169,9 @@ export function WatchScreen({ navigation, route }: Props) {
       clearInterval(intervalId);
       try {
         const time = player.currentTime;
+        const duration = Number.isFinite(player.duration) ? player.duration : undefined;
         if (Number.isFinite(time)) {
-          void saveWatchProgress(movieId, selectedEpisode, time, meta);
+          void saveWatchProgress(movieId, selectedEpisode, time, { ...meta, durationSeconds: duration });
         }
       } catch {
         // Ignore khi unmount

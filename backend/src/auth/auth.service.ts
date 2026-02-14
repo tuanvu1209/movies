@@ -1,5 +1,6 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { QueryFailedError } from 'typeorm';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
@@ -35,10 +36,17 @@ export class AuthService {
   async register(email: string, password: string, name: string) {
     const existingUser = await this.usersService.findByEmail(email);
     if (existingUser) {
-      throw new UnauthorizedException('Email already exists');
+      throw new ConflictException('Email đã tồn tại');
     }
 
-    const user = await this.usersService.create(email, password, name);
-    return this.login(user);
+    try {
+      const user = await this.usersService.create(email, password, name);
+      return this.login(user);
+    } catch (err) {
+      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+        throw new ConflictException('Email đã tồn tại');
+      }
+      throw err;
+    }
   }
 }

@@ -15,7 +15,14 @@ import { HomepageData, HomepageMovie } from "../types/homepage";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
-type ContinueMovie = HomepageMovie & { _episode: number };
+type ContinueMovie = HomepageMovie & {
+  _episode: number;
+  _progress?: { currentTimeSeconds: number; durationSeconds?: number };
+};
+
+type Section =
+  | { type: "continue"; key: string }
+  | { type: "category"; key: string; title: string; data: HomepageMovie[] };
 
 export function HomeScreen({ navigation }: Props) {
   const { user, logout } = useAuth();
@@ -29,6 +36,24 @@ export function HomeScreen({ navigation }: Props) {
     setContinueList(list);
   }, []);
 
+  const loadHomepage = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [data, list] = await Promise.all([
+        getBluphimHomepage(),
+        getWatchProgressList(),
+      ]);
+      setHomepageData(data ?? []);
+      setContinueList(list ?? []);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Cannot load homepage"));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Refresh "Tiếp tục xem" khi quay lại màn (vd từ Watch)
   useFocusEffect(
     useCallback(() => {
       void loadContinueList();
@@ -36,19 +61,8 @@ export function HomeScreen({ navigation }: Props) {
   );
 
   useEffect(() => {
-    async function loadHomepage() {
-      try {
-        setLoading(true);
-        const data = await getBluphimHomepage();
-        setHomepageData(data ?? []);
-      } catch (err) {
-        setError(getApiErrorMessage(err, "Cannot load homepage"));
-      } finally {
-        setLoading(false);
-      }
-    }
     void loadHomepage();
-  }, []);
+  }, [loadHomepage]);
 
   const handleMovieSelect = useCallback(
     (movie: HomepageMovie) => {
@@ -70,13 +84,37 @@ export function HomeScreen({ navigation }: Props) {
     [navigation],
   );
 
+  // Gộp "Tiếp tục xem" vào đầu data thay vì ListHeaderComponent
+  // để FlatList focus đúng vào hàng đầu (item index 0)
+  const sections: Section[] =
+    continueList.length > 0
+      ? [
+          { type: "continue", key: "__continue__" },
+          ...homepageData.map((c) => ({
+            type: "category" as const,
+            key: c.title,
+            title: c.title,
+            data: c.data,
+          })),
+        ]
+      : homepageData.map((c) => ({
+          type: "category" as const,
+          key: c.title,
+          title: c.title,
+          data: c.data,
+        }));
+
   return (
     <View style={styles.root}>
       <HomeHeader
         user={user}
         onSignIn={() => navigation.navigate("Login")}
         onRegister={() => navigation.navigate("Register")}
-        onLogout={() => void logout()}
+        onLogout={async () => {
+          await logout();
+          loadHomepage();
+        }}
+        onRefreshRequest={loadHomepage}
       />
 
       {loading ? (
@@ -87,32 +125,38 @@ export function HomeScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
-          data={homepageData}
-          keyExtractor={(item) => item.title}
-          ListHeaderComponent={
-            continueList.length > 0 ? (
+          data={sections}
+          keyExtractor={(item) => item.key}
+          renderItem={({ item, index }) =>
+            item.type === "continue" ? (
               <MovieRow
                 title="Tiếp tục xem"
-                movies={continueList.map((item): ContinueMovie => ({
-                  url: item.movieId,
-                  title: item.title ?? "Phim",
-                  thumbnail: item.thumbnail ?? "",
-                  episode: `Tập ${item.episode}`,
-                  _episode: item.episode,
+                movies={continueList.map((i): ContinueMovie => ({
+                  url: i.movieId,
+                  title: i.title ?? "Phim",
+                  thumbnail: i.thumbnail ?? "",
+                  episode: `Tập ${i.episode}`,
+                  _episode: i.episode,
+                  _progress:
+                    i.currentTimeSeconds > 0
+                      ? {
+                          currentTimeSeconds: i.currentTimeSeconds,
+                          durationSeconds: i.durationSeconds,
+                        }
+                      : undefined,
                 }))}
                 onSelectMovie={handleContinueSelect as (m: HomepageMovie) => void}
-                autoFocusFirstItem={true}
+                autoFocusFirstItem={index === 0}
               />
-            ) : null
+            ) : (
+              <MovieRow
+                title={item.title}
+                movies={item.data}
+                onSelectMovie={handleMovieSelect}
+                autoFocusFirstItem={index === 0}
+              />
+            )
           }
-          renderItem={({ item, index }) => (
-            <MovieRow
-              title={item.title}
-              movies={item.data}
-              onSelectMovie={handleMovieSelect}
-              autoFocusFirstItem={index === 0}
-            />
-          )}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}

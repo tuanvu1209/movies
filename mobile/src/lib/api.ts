@@ -16,7 +16,8 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem("token");
+  const token =
+    (await AsyncStorage.getItem("token")) || (await AsyncStorage.getItem("sessionToken"));
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -80,6 +81,50 @@ export async function getSearch(query: string): Promise<SearchResult[]> {
   if (q.length < 2) return [];
   const response = await api.get<SearchResult[]>(`/movies/search?q=${encodeURIComponent(q)}`);
   return response.data ?? [];
+}
+
+/** Watch progress (yêu cầu đăng nhập). Dùng cho "Tiếp tục xem" khi user đã login. */
+export interface WatchProgressItem {
+  movieId: string;
+  episode: number;
+  currentTimeSeconds: number;
+  updatedAt: number;
+  title?: string;
+  thumbnail?: string;
+  durationSeconds?: number;
+}
+export async function getWatchProgressListApi(): Promise<WatchProgressItem[]> {
+  const response = await api.get<WatchProgressItem[]>("/watch-progress/list");
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+export async function getWatchProgressApi(
+  movieId: string
+): Promise<{ episode: number; currentTimeSeconds: number } | null> {
+  if (!movieId) return null;
+  const response = await api.get<{ episode: number; currentTimeSeconds: number } | null>(
+    `/watch-progress?movieId=${encodeURIComponent(movieId)}`
+  );
+  const data = response.data;
+  if (data && typeof data.episode === "number" && typeof data.currentTimeSeconds === "number")
+    return data;
+  return null;
+}
+
+export async function saveWatchProgressApi(
+  movieId: string,
+  episode: number,
+  currentTimeSeconds: number,
+  meta?: { title?: string; thumbnail?: string; durationSeconds?: number }
+): Promise<void> {
+  await api.put("/watch-progress", {
+    movieId,
+    episode,
+    currentTimeSeconds: Math.max(0, Math.floor(currentTimeSeconds)),
+    title: meta?.title,
+    thumbnail: meta?.thumbnail,
+    durationSeconds: meta?.durationSeconds,
+  });
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {

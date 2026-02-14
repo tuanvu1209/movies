@@ -35,6 +35,14 @@ const MovieCard = React.memo(function MovieCard({
   hasTVPreferredFocus,
 }: MovieCardProps) {
   const views = parseViewCount(movie.viewCount);
+  const progress = (movie as { _progress?: { currentTimeSeconds: number; durationSeconds?: number } })._progress;
+  const progressPercent =
+    progress && progress.currentTimeSeconds > 0 && progress.durationSeconds != null && progress.durationSeconds > 0
+      ? Math.min(100, (progress.currentTimeSeconds / progress.durationSeconds) * 100)
+      : progress && progress.currentTimeSeconds > 0
+        ? 0
+        : null;
+
   return (
     <View style={styles.cardWrapper}>
       {focused && (
@@ -63,6 +71,11 @@ const MovieCard = React.memo(function MovieCard({
           {views > 0 ? <Text style={styles.viewsBadge}>{views} views</Text> : null}
           {movie.episode ? <Text style={styles.episodeBadge}>{movie.episode}</Text> : null}
         </View>
+        {progressPercent != null && (
+          <View style={styles.progressTrack} pointerEvents="none">
+            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+          </View>
+        )}
         <Text style={styles.movieTitle} numberOfLines={1}>
           {movie.title}
         </Text>
@@ -232,6 +245,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  progressTrack: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: 27,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: colors.primary,
+    borderRadius: 2,
   },
   movieTitle: {
     color: colors.text,

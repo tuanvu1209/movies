@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { MoviesModule } from './movies/movies.module';
 import { AdminModule } from './admin/admin.module';
 import { NavModule } from './nav/nav.module';
+import { WatchProgressModule } from './watch-progress/watch-progress.module';
 import { DatabaseConfig } from './config/database.config';
 
 @Module({
@@ -24,6 +25,7 @@ import { DatabaseConfig } from './config/database.config';
     MoviesModule,
     AdminModule,
     NavModule,
+    WatchProgressModule,
   ],
   controllers: [AppController],
   providers: [AppService],

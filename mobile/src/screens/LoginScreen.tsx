@@ -47,7 +47,7 @@ export function LoginScreen({ navigation }: Props) {
         navigation.navigate("Home");
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, "Login failed"));
+      setError(getApiErrorMessage(err, "Đăng nhập thất bại"));
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export function LoginScreen({ navigation }: Props) {
           style={styles.center}
         >
           <View style={styles.card}>
-            <Text style={styles.title}>Sign In</Text>
+            <Text style={styles.title}>Đăng nhập</Text>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <TextInput
@@ -72,7 +72,7 @@ export function LoginScreen({ navigation }: Props) {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              placeholder="Email"
+              placeholder="Email (hoặc tên đăng nhập)"
               placeholderTextColor={colors.textSubtle}
               style={styles.input}
             />
@@ -80,32 +80,34 @@ export function LoginScreen({ navigation }: Props) {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              placeholder="Password"
+              placeholder="Mật khẩu"
               placeholderTextColor={colors.textSubtle}
               style={styles.input}
             />
 
-            <FocusablePressable onPress={() => setRememberMe((prev) => !prev)} style={styles.rememberRow}>
-              <View style={[styles.checkbox, rememberMe && styles.checkboxActive]} />
-              <Text style={styles.rememberText}>Remember me</Text>
-            </FocusablePressable>
+            <View style={styles.rememberRow}>
+              <FocusablePressable onPress={() => setRememberMe((prev) => !prev)} style={styles.checkboxWrapper}>
+                <View style={[styles.checkbox, rememberMe && styles.checkboxActive]} />
+              </FocusablePressable>
+              <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+            </View>
 
-            <FocusablePressable style={styles.button} onPress={handleSubmit} disabled={loading}>
+            <FocusablePressable style={[styles.button, (!email.trim() || !password.trim()) && styles.buttonDisabled]} onPress={handleSubmit} disabled={loading || !email.trim() || !password.trim()}>
               {loading ? (
                 <ActivityIndicator color={colors.text} />
               ) : (
-                <Text style={styles.buttonText}>Sign In</Text>
+                <Text style={[styles.buttonText, (!email.trim() || !password.trim()) && styles.buttonTextDisabled]}>Đăng nhập</Text>
               )}
             </FocusablePressable>
 
-            <Text style={styles.footerText}>
-              New to MOVIE?{" "}
-              <Text style={styles.footerLink} onPress={() => navigation.navigate("Register")}>
-                Sign up now.
-              </Text>
-            </Text>
+            <View style={styles.containerFooterText}>
+              <Text style={styles.footerText}>Chưa có tài khoản?</Text>
+              <FocusablePressable onPress={() => navigation.navigate("Register")}>
+                <Text style={styles.footerLink}>Đăng ký ngay.</Text>
+              </FocusablePressable>
+            </View>
             <FocusablePressable onPress={() => navigation.navigate("Home")} style={styles.guestBtn}>
-              <Text style={styles.guestBtnText}>Continue as guest</Text>
+              <Text style={styles.guestBtnText}>Tiếp tục với tư cách khách</Text>
             </FocusablePressable>
           </View>
         </KeyboardAvoidingView>
@@ -159,12 +161,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 12,
   },
+  checkboxWrapper: {
+    padding: 2,
+    borderRadius: 2,
+  },
   checkbox: {
     width: 18,
     height: 18,
     borderWidth: 1,
     borderColor: colors.textSubtle,
-    marginRight: 8,
     borderRadius: 2,
   },
   checkboxActive: {
@@ -172,6 +177,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   rememberText: {
+    marginLeft: 8,
     color: colors.textMuted,
     fontSize: 13,
   },
@@ -182,22 +188,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  buttonDisabled: {
+    backgroundColor: colors.textSubtle,
+  },
+  buttonTextDisabled: {
+    color: colors.textMuted,
+  },
   buttonText: {
     color: colors.text,
     fontSize: 16,
     fontWeight: "700",
   },
+  containerFooterText: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   footerText: {
     color: colors.textMuted,
-    marginTop: 14,
     textAlign: "center",
+    padding: 4,
   },
   footerLink: {
     color: colors.text,
     fontWeight: "700",
+    padding: 4,
   },
   guestBtn: {
-    marginTop: 12,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,

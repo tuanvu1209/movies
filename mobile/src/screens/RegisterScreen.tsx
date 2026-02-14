@@ -1,10 +1,11 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  ImageBackground,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +18,9 @@ import { getApiErrorMessage, register } from "../lib/api";
 import { RootStackParamList } from "../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
+
+const BG_URL =
+  "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=1400&q=80";
 
 export function RegisterScreen({ navigation }: Props) {
   const { signIn } = useAuth();
@@ -42,96 +46,113 @@ export function RegisterScreen({ navigation }: Props) {
         navigation.navigate("Home");
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, "Registration failed"));
+      setError(getApiErrorMessage(err, "Đăng ký thất bại"));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.select({ ios: "padding", android: undefined })}
-      style={styles.root}
-    >
-      <View style={styles.card}>
-        <Text style={styles.title}>Sign Up</Text>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Name"
-          placeholderTextColor={colors.textSubtle}
-          style={styles.input}
-        />
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="Email"
-          placeholderTextColor={colors.textSubtle}
-          style={styles.input}
-        />
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="Password"
-          placeholderTextColor={colors.textSubtle}
-          style={styles.input}
-        />
-        <FocusablePressable style={styles.button} onPress={handleSubmit} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color={colors.text} />
-          ) : (
-            <Text style={styles.buttonText}>Sign Up</Text>
-          )}
-        </FocusablePressable>
-        <Text style={styles.footer}>
-          Already have an account?{" "}
-          <Text style={styles.link} onPress={() => navigation.navigate("Login")}>
-            Sign in
-          </Text>
-        </Text>
-        <FocusablePressable onPress={() => navigation.navigate("Home")} style={styles.guestBtn}>
-          <Text style={styles.guestBtnText}>Continue as guest</Text>
-        </FocusablePressable>
-      </View>
-    </KeyboardAvoidingView>
+    <ImageBackground source={{ uri: BG_URL }} resizeMode="cover" style={styles.background}>
+      <LinearGradient
+        colors={["rgba(0,0,0,0.82)", "rgba(0,0,0,0.6)", "rgba(0,0,0,0.92)"]}
+        style={styles.overlay}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.select({ ios: "padding", android: undefined })}
+          style={styles.center}
+        >
+          <View style={styles.card}>
+            <Text style={styles.title}>Đăng ký</Text>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Họ tên"
+              placeholderTextColor={colors.textSubtle}
+              style={styles.input}
+            />
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="Email"
+              placeholderTextColor={colors.textSubtle}
+              style={styles.input}
+            />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="Mật khẩu"
+              placeholderTextColor={colors.textSubtle}
+              style={styles.input}
+            />
+
+            <FocusablePressable style={styles.button} onPress={handleSubmit} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <Text style={styles.buttonText}>Đăng ký</Text>
+              )}
+            </FocusablePressable>
+
+            <View style={styles.containerFooterText}>
+              <Text style={styles.footerText}>Đã có tài khoản?</Text>
+              <FocusablePressable onPress={() => navigation.navigate("Login")}>
+                <Text style={styles.footerLink}>Đăng nhập.</Text>
+              </FocusablePressable>
+            </View>
+            <FocusablePressable onPress={() => navigation.navigate("Home")} style={styles.guestBtn}>
+              <Text style={styles.guestBtnText}>Tiếp tục với tư cách khách</Text>
+            </FocusablePressable>
+          </View>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  background: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  overlay: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  center: {
+    flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 20,
   },
   card: {
-    backgroundColor: colors.surface,
+    width: "100%",
+    maxWidth: 460,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
     borderRadius: 12,
-    padding: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 26,
   },
   title: {
     color: colors.text,
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: "700",
-    marginBottom: 16,
-    textAlign: "center",
+    marginBottom: 18,
   },
   errorText: {
-    color: "#ef4444",
-    marginBottom: 10,
-    textAlign: "center",
+    color: "#f87171",
+    marginBottom: 8,
   },
   input: {
-    height: 48,
+    height: 50,
     borderRadius: 8,
-    backgroundColor: "#2b2b2b",
+    backgroundColor: "#333333",
     color: colors.text,
-    marginBottom: 10,
     paddingHorizontal: 14,
+    marginBottom: 10,
   },
   button: {
     height: 48,
@@ -139,24 +160,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
   },
   buttonText: {
     color: colors.text,
     fontSize: 16,
     fontWeight: "700",
   },
-  footer: {
-    color: colors.textMuted,
-    marginTop: 12,
-    textAlign: "center",
+  containerFooterText: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  link: {
+  footerText: {
+    color: colors.textMuted,
+    textAlign: "center",
+    padding: 4,
+  },
+  footerLink: {
     color: colors.text,
     fontWeight: "700",
+    padding: 4,
   },
   guestBtn: {
-    marginTop: 12,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,

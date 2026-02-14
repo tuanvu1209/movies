@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -8,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { User } from "../types/user";
 import { colors } from "../constants/theme";
@@ -35,18 +36,41 @@ interface HomeHeaderProps {
   onSignIn: () => void;
   onRegister: () => void;
   onLogout: () => void;
+  onRefreshRequest?: () => void;
 }
 
-export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderProps) {
+export function HomeHeader({ user, onSignIn, onRegister, onLogout, onRefreshRequest }: HomeHeaderProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, "Home">>();
+  const route = useRoute();
   const [navItems, setNavItems] = useState<NavItem[]>([]);
+  const isHome = route.name === "Home";
+  const categorySlug = route.name === "Category" ? (route.params as { slug?: string })?.slug ?? "" : "";
+
+  const isNavItemActive = useCallback(
+    (item: NavItem) => {
+      if (item.children?.length) {
+        return item.children.some((c) => getSlugFromUrl(c.url) === categorySlug);
+      }
+      if (isHome) return isHomeUrl(item.url);
+      return getSlugFromUrl(item.url) === categorySlug;
+    },
+    [isHome, categorySlug],
+  );
   const [openDropdownKey, setOpenDropdownKey] = useState<string | null>(null);
   const [dropdownLayout, setDropdownLayout] = useState<{
     x: number;
     y: number;
     width: number;
   } | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userMenuLayout, setUserMenuLayout] = useState<{
+    x: number;
+    y: number;
+    width: number;
+  } | null>(null);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const menuItemRefs = useRef<Record<string, View | null>>({});
+  const userButtonRef = useRef<View | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +87,10 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
 
   const handleNavPress = useCallback(
     (item: NavItem) => {
+      if (isNavItemActive(item)) {
+        onRefreshRequest?.();
+        return;
+      }
       if (isHomeUrl(item.url)) {
         navigation.navigate("Home");
         return;
@@ -70,17 +98,21 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
       const slug = getSlugFromUrl(item.url);
       if (slug) navigation.navigate("Category", { slug });
     },
-    [navigation],
+    [navigation, isNavItemActive, onRefreshRequest],
   );
 
   const handleChildPress = useCallback(
     (child: NavItem) => {
+      const slug = getSlugFromUrl(child.url);
       setOpenDropdownKey(null);
       setDropdownLayout(null);
-      const slug = getSlugFromUrl(child.url);
+      if (slug === categorySlug) {
+        onRefreshRequest?.();
+        return;
+      }
       if (slug) navigation.navigate("Category", { slug });
     },
-    [navigation],
+    [navigation, categorySlug, onRefreshRequest],
   );
 
   return (
@@ -103,15 +135,143 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
           </FocusablePressable>
 
           {user ? (
-            <FocusablePressable onPress={onLogout} style={styles.focusableLink}>
-              <Text style={styles.link}>Đăng xuất</Text>
-            </FocusablePressable>
-          ) : (
-            <>
-              <FocusablePressable onPress={onSignIn} style={styles.focusableButton}>
-                <Text style={styles.signInButton}>Đăng nhập</Text>
+            <View
+              ref={(r) => { userButtonRef.current = r; }}
+              collapsable={false}
+              style={styles.userWrap}
+            >
+              <FocusablePressable
+                onPress={() => {
+                  if (userMenuOpen) {
+                    setUserMenuOpen(false);
+                    setUserMenuLayout(null);
+                    return;
+                  }
+                  const ref = userButtonRef.current;
+                  const { width: winW, height: winH } = Dimensions.get("window");
+                  const menuW = 160;
+                  const menuH = 320;
+                  if (ref && typeof ref.measureInWindow === "function") {
+                    ref.measureInWindow((x, y, width, height) => {
+                      let left = x;
+                      let top = y + height;
+                      if (left + menuW > winW) left = Math.max(0, winW - menuW);
+                      if (left < 0) left = 0;
+                      if (top + menuH > winH) top = Math.max(0, winH - menuH);
+                      if (top < 0) top = 0;
+                      setUserMenuLayout({ x: left, y: top, width: menuW });
+                      setUserMenuOpen(true);
+                    });
+                  } else {
+                    setUserMenuLayout({ x: 16, y: 70, width: menuW });
+                    setUserMenuOpen(true);
+                  }
+                }}
+                style={styles.avatarTouch }
+              >
+                {user.avatar ? (
+                  <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Text style={styles.avatarLetter}>
+                      {(user.name || user.email || "U").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
               </FocusablePressable>
-            </>
+              <Modal
+                visible={userMenuOpen}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                  setUserMenuOpen(false);
+                  setUserMenuLayout(null);
+                }}
+              >
+                <Pressable
+                  style={styles.dropdownBackdrop}
+                  onPress={() => {
+                    setUserMenuOpen(false);
+                    setUserMenuLayout(null);
+                  }}
+                />
+                {userMenuLayout && (
+                  <View
+                    style={[
+                      styles.dropdownBox,
+                      {
+                        position: "absolute",
+                        left: userMenuLayout.x,
+                        top: userMenuLayout.y,
+                        minWidth: userMenuLayout.width,
+                      },
+                    ]}
+                  >
+                    <ScrollView style={styles.dropdownList}>
+                      <FocusablePressable
+                        onPress={() => {
+                          setUserMenuOpen(false);
+                          setUserMenuLayout(null);
+                          // TODO: navigate to Profile
+                        }}
+                        style={styles.dropdownItem}
+                        hasTVPreferredFocus
+                      >
+                        <Text style={styles.dropdownItemText}>Hồ sơ</Text>
+                      </FocusablePressable>
+                      <FocusablePressable
+                        onPress={() => {
+                          setUserMenuOpen(false);
+                          setUserMenuLayout(null);
+                          setLogoutConfirmVisible(true);
+                        }}
+                        style={styles.dropdownItem}
+                      >
+                        <Text style={styles.dropdownItemText}>Đăng xuất</Text>
+                      </FocusablePressable>
+                    </ScrollView>
+                  </View>
+                )}
+              </Modal>
+              <Modal
+                visible={logoutConfirmVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setLogoutConfirmVisible(false)}
+              >
+                <Pressable
+                  style={styles.confirmBackdrop}
+                  onPress={() => setLogoutConfirmVisible(false)}
+                />
+                <View style={styles.confirmBox}>
+                  <View style={styles.confirmCard}>
+                    <Text style={styles.confirmTitle}>Bạn có chắc muốn đăng xuất?</Text>
+                    <View style={styles.confirmActions}>
+                      <FocusablePressable
+                        onPress={() => setLogoutConfirmVisible(false)}
+                        style={styles.confirmButtonSecondary}
+                      >
+                        <Text style={styles.confirmButtonSecondaryText}>Hủy</Text>
+                      </FocusablePressable>
+                      <FocusablePressable
+                        onPress={() => {
+                          setLogoutConfirmVisible(false);
+                          onLogout();
+                        }}
+                        style={styles.confirmButtonPrimary}
+                        hasTVPreferredFocus
+                      >
+                        <Text style={styles.confirmButtonPrimaryText}>Đăng xuất</Text>
+                      </FocusablePressable>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            </View>
+          ) : (
+            <FocusablePressable onPress={onSignIn} style={styles.focusableButton}>
+              <Text style={styles.signInButton}>Đăng nhập</Text>
+            </FocusablePressable>
           )}
         </View>
       </View>
@@ -140,6 +300,7 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
                 setDropdownLayout({ x: 16, y: 120, width: 200 });
               }
             };
+            const active = isNavItemActive(item);
             return (
               <View
                 key={item.title}
@@ -149,10 +310,10 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
               >
                 <FocusablePressable
                   onPress={openDropdown}
-                  style={styles.menuLink}
+                  style={[styles.menuLink, active && styles.menuLinkActive]}
                 >
-                  <Text style={styles.menuText}>{item.title}</Text>
-                  <Text style={styles.menuCaret}> ▼</Text>
+                  <Text style={[styles.menuText, active && styles.menuTextActive]}>{item.title}</Text>
+                  <Text style={[styles.menuCaret, active && styles.menuTextActive]}> ▼</Text>
                 </FocusablePressable>
                 <Modal
                   visible={isOpen}
@@ -203,13 +364,14 @@ export function HomeHeader({ user, onSignIn, onRegister, onLogout }: HomeHeaderP
               </View>
             );
           }
+          const active = isNavItemActive(item);
           return (
             <FocusablePressable
               key={item.title}
               onPress={() => handleNavPress(item)}
-              style={styles.menuLink}
+              style={[styles.menuLink, active && styles.menuLinkActive]}
             >
-              <Text style={styles.menuText}>{item.title}</Text>
+              <Text style={[styles.menuText, active && styles.menuTextActive]}>{item.title}</Text>
             </FocusablePressable>
           );
         })}
@@ -280,7 +442,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   searchPlaceholder: {
-    color: colors.textSubtle,
+    color: colors.text,
     fontSize: 13,
   },
   link: {
@@ -295,6 +457,31 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     fontWeight: "700",
     overflow: "hidden",
+  },
+  userWrap: {
+    marginLeft: 8,
+  },
+  avatarTouch: {
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarLetter: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "700",
   },
   menuRow: {
     flexDirection: "row",
@@ -314,7 +501,15 @@ const styles = StyleSheet.create({
   },
   menuText: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: 16,
+  },
+  menuTextActive: {
+    color: colors.text,
+    fontWeight: "700",
+  },
+  menuLinkActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: colors.text,
   },
   menuCaret: {
     color: colors.textSubtle,
@@ -354,6 +549,59 @@ const styles = StyleSheet.create({
   dropdownItemText: {
     color: colors.text,
     fontSize: 15,
+  },
+  confirmBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  confirmBox: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  confirmCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 24,
+    minWidth: 280,
+  },
+  confirmTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  confirmButtonSecondary: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmButtonSecondaryText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  confirmButtonPrimary: {
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+  },
+  confirmButtonPrimaryText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600",
   },
   userText: {
     color: colors.textSubtle,

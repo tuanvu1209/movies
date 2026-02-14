@@ -1,4 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getWatchProgressListApi,
+  getWatchProgressApi,
+  saveWatchProgressApi,
+} from "./api";
 
 const STORAGE_KEY_PREFIX = "watchProgress_";
 const LIST_STORAGE_KEY = "watchProgressList";
@@ -11,14 +16,26 @@ export type WatchProgress = {
   updatedAt: number;
   title?: string;
   thumbnail?: string;
+  /** Tổng thời gian tập (giây), dùng để vẽ progress bar */
+  durationSeconds?: number;
 };
 
 export async function saveWatchProgress(
   movieId: string,
   episode: number,
   currentTimeSeconds: number,
-  meta?: { title?: string; thumbnail?: string }
+  meta?: { title?: string; thumbnail?: string; durationSeconds?: number }
 ): Promise<void> {
+  const token =
+    (await AsyncStorage.getItem("token")) || (await AsyncStorage.getItem("sessionToken"));
+  if (token) {
+    try {
+      await saveWatchProgressApi(movieId, episode, currentTimeSeconds, meta);
+      return;
+    } catch {
+      // Fallback to local on API error
+    }
+  }
   const payload: WatchProgress = {
     movieId,
     episode,
@@ -26,6 +43,7 @@ export async function saveWatchProgress(
     updatedAt: Date.now(),
     title: meta?.title,
     thumbnail: meta?.thumbnail,
+    durationSeconds: meta?.durationSeconds != null ? Math.max(0, Math.floor(meta.durationSeconds)) : undefined,
   };
   await AsyncStorage.setItem(
     `${STORAGE_KEY_PREFIX}${movieId}`,
@@ -51,6 +69,16 @@ export async function saveWatchProgress(
 export async function getWatchProgress(
   movieId: string
 ): Promise<{ episode: number; currentTimeSeconds: number } | null> {
+  const token =
+    (await AsyncStorage.getItem("token")) || (await AsyncStorage.getItem("sessionToken"));
+  if (token) {
+    try {
+      const data = await getWatchProgressApi(movieId);
+      if (data) return data;
+    } catch {
+      // Fallback to local
+    }
+  }
   const raw = await AsyncStorage.getItem(`${STORAGE_KEY_PREFIX}${movieId}`);
   if (!raw) return null;
   try {
@@ -66,8 +94,25 @@ export async function getWatchProgress(
   }
 }
 
-/** Danh sách phim đã xem (dùng cho hàng "Tiếp tục xem" ở homepage), mới nhất trước */
+/** Danh sách phim đã xem (dùng cho hàng "Tiếp tục xem" ở homepage), mới nhất trước. Khi đã đăng nhập thì lấy từ API. */
 export async function getWatchProgressList(): Promise<WatchProgress[]> {
+  const token =
+    (await AsyncStorage.getItem("token")) || (await AsyncStorage.getItem("sessionToken"));
+  if (token) {
+    try {
+      const list = await getWatchProgressListApi();
+      return Array.isArray(list)
+        ? list.filter(
+            (item) =>
+              item.movieId &&
+              typeof item.episode === "number" &&
+              Number.isFinite(item.currentTimeSeconds)
+          )
+        : [];
+    } catch {
+      // Fallback to local cache
+    }
+  }
   const raw = await AsyncStorage.getItem(LIST_STORAGE_KEY);
   if (!raw) return [];
   try {

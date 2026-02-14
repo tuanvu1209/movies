@@ -1,8 +1,8 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   BackHandler,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,14 +19,10 @@ import type { HomepageMovie } from "../types/homepage";
 
 const SEARCH_DEBOUNCE_MS = 400;
 
-/** Bàn phím ảo: 6 ký tự mỗi hàng (a-z, 0-9) + Space + Xóa */
+/** Bàn phím ảo: chữ a-z, số 0-9, space, backspace */
 const KEY_ROWS: string[][] = [
-  ["a", "b", "c", "d", "e", "f"],
-  ["g", "h", "i", "j", "k", "l"],
-  ["m", "n", "o", "p", "q", "r"],
-  ["s", "t", "u", "v", "w", "x"],
-  ["y", "z", "0", "1", "2", "3"],
-  ["4", "5", "6", "7", "8", "9"],
+  ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  [" ", "⌫", 'Xoá'],
 ];
 
 const KEY_SPECIAL = { space: " ", backspace: "⌫" } as const;
@@ -81,11 +77,19 @@ export function SearchScreen({ navigation }: Props) {
   }, [goBack]);
 
   const handleKeyPress = useCallback((char: string) => {
+    if (char === 'Xoá') {
+      setQuery("");
+      return;
+    }
     if (char === KEY_SPECIAL.backspace) {
-      setQuery((q) => q.slice(0, -1));
+      setQuery((q) => (q.length > 0 ? q.slice(0, -1) : ""));
     } else {
       setQuery((q) => q + char);
     }
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    setQuery("");
   }, []);
 
   const handleResultPress = useCallback(
@@ -98,14 +102,16 @@ export function SearchScreen({ navigation }: Props) {
   return (
     <View style={styles.root}>
       <View style={styles.main}>
-        {/* Ngăn trái: input + bàn phím ký tự */}
+        {/* Left: header + search box + virtual keyboard */}
         <View style={styles.leftPanel}>
+          <Text style={styles.screenTitle}>Tìm kiếm</Text>
           <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>⌕</Text>
             <TextInput
               value={query}
               onChangeText={setQuery}
               style={styles.searchInput}
-              placeholder="Tìm kiếm..."
+              placeholder="Phim, thể loại..."
               placeholderTextColor={colors.textSubtle}
               autoFocus
               showSoftInputOnFocus={false}
@@ -116,60 +122,63 @@ export function SearchScreen({ navigation }: Props) {
               <View key={`row-${rowIndex}`} style={styles.keyRow}>
                 {row.map((char) => (
                   <FocusablePressable
-                    key={char}
-                    style={styles.keyButton}
+                    key={`${rowIndex}-${char}`}
+                    style={[
+                      styles.keyButton,
+                      char === " " && styles.keyButtonSpace,
+                      char === KEY_SPECIAL.backspace && styles.keyButtonBackspace,
+                    ]}
                     onPress={() => handleKeyPress(char)}
                   >
-                    <Text style={styles.keyLabel}>{char}</Text>
+                    <Text
+                      style={[
+                        styles.keyLabel,
+                        char === KEY_SPECIAL.backspace && styles.keyLabelBackspace,
+                      ]}
+                    >
+                      {char === " " ? "Space" : char}
+                    </Text>
                   </FocusablePressable>
                 ))}
               </View>
             ))}
-            <View style={styles.keyRowWide}>
-              <View style={styles.keyButtonWideWrap}>
-                <FocusablePressable
-                  style={[styles.keyButton, styles.keyButtonWideFill]}
-                  onPress={() => handleKeyPress(KEY_SPECIAL.space)}
-                >
-                  <Text style={styles.keyLabelWide}>Space</Text>
-                </FocusablePressable>
-              </View>
-              <View style={styles.keyButtonWideWrap}>
-                <FocusablePressable
-                  style={[styles.keyButton, styles.keyButtonWideFill]}
-                  onPress={() => handleKeyPress(KEY_SPECIAL.backspace)}
-                >
-                  <Text style={styles.keyLabelWide}>Xóa</Text>
-                </FocusablePressable>
-              </View>
-            </View>
           </View>
         </View>
 
-        {/* Ngăn phải: danh sách kết quả (ảnh + title) */}
+        {/* Right: search results */}
         <View style={styles.rightPanel}>
+          <View style={styles.resultHeader}>
+            <View style={styles.resultHeaderAccent} />
+            <Text style={styles.resultHeaderTitle}>Kết quả</Text>
+          </View>
           {loading ? (
             <View style={styles.centerContent}>
-              <Text style={styles.placeholderText}>Đang tìm...</Text>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.placeholderText}>Đang tìm kiếm...</Text>
             </View>
           ) : debouncedQuery.length < 2 ? (
             <View style={styles.centerContent}>
+              <Text style={styles.placeholderIcon}>⌕</Text>
               <Text style={styles.placeholderText}>
-                Gõ ít nhất 2 ký tự để tìm kiếm
+                Gõ ít nhất 2 ký tự để tìm
               </Text>
+              <Text style={styles.placeholderHint}>Ví dụ: hành động, kinh dị</Text>
             </View>
           ) : results.length === 0 ? (
             <View style={styles.centerContent}>
-              <Text style={styles.placeholderText}>Không tìm thấy</Text>
+              <Text style={styles.placeholderIcon}>∅</Text>
+              <Text style={styles.placeholderText}>Không có kết quả</Text>
+              <Text style={styles.placeholderHint}>Thử từ khóa khác</Text>
             </View>
           ) : (
             <ScrollView
               style={styles.resultList}
               contentContainerStyle={styles.resultListContent}
               keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
               <MovieRow
-                title="Kết quả tìm kiếm"
+                title=""
                 movies={results as HomepageMovie[]}
                 onSelectMovie={handleResultPress}
                 isScroll={false}
@@ -182,8 +191,7 @@ export function SearchScreen({ navigation }: Props) {
   );
 }
 
-const KEY_SIZE = 36;
-const KEY_SIZE_WIDE = 52;
+const KEY_SIZE = 40;
 const KEY_GAP = 6;
 
 const styles = StyleSheet.create({
@@ -198,23 +206,39 @@ const styles = StyleSheet.create({
   leftPanel: {
     width: 380,
     borderRightWidth: 1,
-    borderRightColor: colors.border,
-    padding: 16,
-    paddingTop: 24,
+    borderRightColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 24,
+    backgroundColor: "#0a0a0a",
+  },
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: colors.text,
+    letterSpacing: 0.5,
+    marginBottom: 20,
   },
   searchBox: {
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 44,
-    marginBottom: 20,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  searchIcon: {
+    fontSize: 20,
+    color: colors.textSubtle,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
     color: colors.text,
-    fontSize: 16,
+    fontSize: 17,
     paddingVertical: 0,
   },
   keyboard: {
@@ -225,67 +249,101 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: KEY_GAP,
   },
+  keyRowWide: {
+    flexDirection: "row",
+    marginTop: 4,
+  },
   keyButton: {
     width: KEY_SIZE,
     height: KEY_SIZE,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  keyRowWide: {
-    flexDirection: "row",
-    gap: KEY_GAP,
+  keyButtonSpace: {
+    minWidth: 80,
+    flex: 1,
   },
-  keyButtonWideWrap: {
-  },
-  keyButtonWideFill: {
-    width: 100,
+  keyButtonBackspace: {
+    minWidth: 56,
   },
   keyLabel: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "600",
   },
-  keyLabelWide: {
-    fontSize: 17,
+  keyLabelBackspace: {
+    fontSize: 22,
+  },
+  clearButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  clearButtonLabel: {
+    color: colors.textMuted,
+    fontSize: 15,
     fontWeight: "600",
-    color: "#ffffff",
-    lineHeight: 22,
   },
   rightPanel: {
     flex: 1,
-    padding: 16,
-    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
   },
-  rightHeader: {
-    marginBottom: 16,
+  resultHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
   },
-  backButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+  resultHeaderAccent: {
+    width: 4,
+    height: 22,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+    marginRight: 12,
   },
-  backLabel: {
+  resultHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
     color: colors.text,
-    fontSize: 15,
+    letterSpacing: 0.3,
   },
   resultList: {
     flex: 1,
   },
   resultListContent: {
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
   centerContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  placeholderIcon: {
+    fontSize: 48,
+    color: colors.textSubtle,
+    marginBottom: 12,
+    opacity: 0.6,
   },
   placeholderText: {
     color: colors.textMuted,
-    fontSize: 15,
+    fontSize: 18,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  placeholderHint: {
+    color: colors.textSubtle,
+    fontSize: 14,
+    marginTop: 6,
+    textAlign: "center",
   },
 });

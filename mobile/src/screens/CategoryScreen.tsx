@@ -27,23 +27,20 @@ export function CategoryScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const loadCategory = useCallback(() => {
     if (!slug) return;
-    let cancelled = false;
     setLoading(true);
     setError("");
     getCategory(slug, page)
-      .then((data) => {
-        if (!cancelled) setResult(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(getApiErrorMessage(err, "Không tải được danh mục"));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
+      .then((data) => setResult(data))
+      .catch((err) => setError(getApiErrorMessage(err, "Không tải được danh mục")))
+      .finally(() => setLoading(false));
   }, [slug, page]);
+
+  useEffect(() => {
+    if (!slug) return;
+    loadCategory();
+  }, [slug, page, loadCategory]);
 
   const handleMovieSelect = useCallback(
     (movie: HomepageMovie) => {
@@ -71,8 +68,9 @@ export function CategoryScreen({ navigation, route }: Props) {
       onSignIn: () => navigation.navigate("Login"),
       onRegister: () => navigation.navigate("Register"),
       onLogout: () => void logout(),
+      onRefreshRequest: loadCategory,
     }),
-    [user, navigation, logout],
+    [user, navigation, logout, loadCategory],
   );
 
   if (!slug) {
